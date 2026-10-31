@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Game Event Tracker</title>
+<meta name="theme-color" content="#0f1117">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Game <span>Event</span> Tracker</h1>
+      <div class="sub">Never miss a limited-time event again.</div>
+    </div>
+    <div class="head-right">
+      <div class="sync"><span class="dot" id="syncDot"></span><span id="syncText">Loading…</span></div>
+      <div id="userBox"></div>
+    </div>
+  </header>
+
+  <!-- Sign-in screen (Firebase mode only) -->
+  <div id="signin" class="signin" hidden>
+    <div class="card">
+      <h2>Sign in to sync</h2>
+      <p>Your events are saved to your account and show up on every device you sign in on.</p>
+      <button class="btn" id="googleBtn">Sign in with Google</button>
+      <div class="err" id="signErr"></div>
+    </div>
+  </div>
+
+  <main id="app" hidden>
+    <div class="stats">
+      <div class="stat red"><b id="sToday">0</b><small>Ending within 24h</small></div>
+      <div class="stat amber"><b id="sWeek">0</b><small>Ending within 3 days</small></div>
+      <div class="stat"><b id="sActive">0</b><small>Active, not done</small></div>
+      <div class="stat green"><b id="sDone">0</b><small>Done</small></div>
+    </div>
+
+    <div class="layout">
+      <aside>
+        <div class="card">
+          <h2 id="formTitle">Add event</h2>
+          <form id="evForm" autocomplete="off">
+            <label>Game</label>
+            <select id="fGame"></select>
+            <label>Event name</label>
+            <input id="fName" placeholder="e.g. Halloween Gacha Banner" maxlength="120">
+
+            <div class="seg" id="modeSeg">
+              <button type="button" data-m="left" class="on">Time left</button>
+              <button type="button" data-m="date">End date</button>
+            </div>
+            <div id="modeLeft">
+              <div class="row">
+                <div><label>Days</label><input id="fD" type="number" min="0" placeholder="0"></div>
+                <div><label>Hours</label><input id="fH" type="number" min="0" placeholder="0"></div>
+                <div><label>Minutes</label><input id="fM" type="number" min="0" placeholder="0"></div>
+              </div>
+              <div class="hint">Copy the countdown the game shows you.</div>
+            </div>
+            <div id="modeDate" hidden>
+              <label>Ends on</label>
+              <input id="fEnd" type="datetime-local">
+              <label class="inline"><input type="checkbox" id="fServer"> This is the game's <b>server time</b> <span id="fServerTz"></span></label>
+            </div>
+
+            <label>Priority</label>
+            <div class="seg" id="prioSeg">
+              <button type="button" data-p="must">🔥 Must-do</button>
+              <button type="button" data-p="normal" class="on">Normal</button>
+              <button type="button" data-p="low">Low</button>
+            </div>
+
+            <details id="moreOpts">
+              <summary>More options</summary>
+              <label>Repeats</label>
+              <select id="fRepeat">
+                <option value="0">Doesn't repeat</option>
+                <option value="1">Every day</option>
+                <option value="7">Every week</option>
+                <option value="14">Every 2 weeks</option>
+                <option value="21">Every 3 weeks</option>
+                <option value="28">Every 4 weeks</option>
+                <option value="42">Every 6 weeks</option>
+                <option value="custom">Custom…</option>
+              </select>
+              <div id="customRepeat" hidden>
+                <label>Repeat every (days)</label>
+                <input id="fRepeatDays" type="number" min="1" placeholder="e.g. 10">
+              </div>
+              <div class="hint">When it ends, the next round starts by itself and your progress resets.</div>
+
+              <label>Goal counter (optional)</label>
+              <input id="fGoal" type="number" min="0" placeholder="e.g. 5 shop items, 30 stages">
+
+              <label>Checklist (optional, one task per line)</label>
+              <textarea id="fChecklist" placeholder="Clear story&#10;Buy shop items&#10;Claim login rewards"></textarea>
+
+              <label>Notes</label>
+              <textarea id="fNote" placeholder="Rewards, currency to spend…" maxlength="500"></textarea>
+            </details>
+
+            <div class="err" id="fErr"></div>
+            <button class="btn" type="submit" id="fSubmit">Add event</button>
+            <button class="btn ghost" type="button" id="fCancel" hidden>Cancel edit</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h2>My games</h2>
+          <div class="games" id="gameList"></div>
+          <button class="btn ghost" id="addGameBtn">+ Add game</button>
+        </div>
+
+        <div class="card">
+          <h2>Backup</h2>
+          <div class="row">
+            <button class="btn ghost small" id="exportBtn">Export</button>
+            <label class="btn ghost small filebtn">Import<input type="file" id="importFile" accept=".json,application/json" hidden></label>
+          </div>
+          <div class="hint">Saves everything to a file, or loads it back.</div>
+        </div>
+      </aside>
+
+      <section>
+        <div id="resets"></div>
+        <div class="toolbar" id="toolbar"></div>
+        <div class="list" id="list"></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- Game editor -->
+<div class="modal" id="gameModal">
+  <div class="card">
+    <h2 id="gmTitle">Add game</h2>
+    <form id="gForm" autocomplete="off">
+      <div class="row" style="align-items:flex-end">
+        <div style="flex:4"><label>Name</label><input id="gName" maxlength="40" placeholder="e.g. Genshin Impact"></div>
+        <div style="flex:none"><label>Color</label><input id="gColor" type="color"></div>
+      </div>
+      <label>Server timezone</label>
+      <select id="gOffset"></select>
+      <div class="hint">Asia servers are usually UTC+8, America UTC−5, Europe UTC+1.</div>
+      <div class="row">
+        <div><label>Daily reset</label><select id="gDaily"></select></div>
+        <div><label>Weekly reset</label><select id="gWeekly"></select></div>
+      </div>
+      <div class="hint">Reset times are in server time. Many games reset at 4:00 AM.</div>
+      <div class="err" id="gErr"></div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn ghost" type="button" id="gCancel" style="margin:0">Cancel</button>
+        <button class="btn" type="submit" style="margin:0">Save</button>
+      </div>
+      <button class="btn danger-link" type="button" id="gDelete" hidden>Remove this game</button>
+    </form>
+  </div>
+</div>
+
+<!-- Confirm dialog -->
+<div class="modal" id="confirm">
+  <div class="card">
+    <h2 id="cTitle">Are you sure?</h2>
+    <div id="cMsg"></div>
+    <div class="row" style="margin-top:16px">
+      <button class="btn ghost" style="margin:0" id="cNo">Cancel</button>
+      <button class="btn danger" style="margin:0" id="cYes">Delete</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
