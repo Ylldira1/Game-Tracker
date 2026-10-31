@@ -15,7 +15,7 @@ const state = {
   games: {}, events: {},
   filter: 'all', showDone: false,
   mode: 'left', prio: 'normal',
-  editId: null, editGameId: null,
+  editId: null, editGameId: null, quick: null,
 };
 let store = null;
 
@@ -79,13 +79,16 @@ async function firebaseStore(){
     user=u;
     if(!u){
       state.games={}; state.events={};
-      $('app').hidden=true; $('signin').hidden=false; $('userBox').innerHTML='';
+      $('app').hidden=true; $('fab').hidden=true; $('signin').hidden=false; $('userBox').innerHTML='';
+      $('signOutBtn').hidden=true; $('signOutSep').hidden=true;
       setSync('','Signed out');
       return;
     }
-    $('signin').hidden=true; $('app').hidden=false;
-    $('userBox').innerHTML=`${u.photoURL?`<img src="${esc(u.photoURL)}" alt="" referrerpolicy="no-referrer">`:''}<span>${esc(u.displayName||u.email||'')}</span><button class="chip" id="signOutBtn">Sign out</button>`;
-    $('signOutBtn').onclick=()=>signOut(auth);
+    $('signin').hidden=true; $('app').hidden=false; $('fab').hidden=false;
+    const nm=u.displayName||u.email||'';
+    $('userBox').innerHTML=`${u.photoURL?`<img src="${esc(u.photoURL)}" alt="" referrerpolicy="no-referrer">`:`<span class="avatar">${esc(nm.charAt(0).toUpperCase())}</span>`}<span>${esc(nm)}</span>`;
+    $('signOutBtn').hidden=false; $('signOutSep').hidden=false;
+    $('signOutBtn').onclick=()=>{ closeMenu(); signOut(auth); };
     setSync('warn','Connecting…');
     const sub=(name,target)=>fs.onSnapshot(fs.collection(db,'users',u.uid,name),snap=>{
       const out={}; snap.forEach(d=>{ out[d.id]={...d.data(),id:d.id}; });
@@ -140,42 +143,49 @@ const gamesSorted = () => Object.values(state.games).sort((a,b)=>(a.created||0)-
 const repeatLabel = r => ({1:'Daily',7:'Weekly',14:'Every 2 wks',21:'Every 3 wks',28:'Every 4 wks',42:'Every 6 wks'}[r] || `Every ${r}d`);
 
 /* ---------------- Render ---------------- */
-function renderGames(){
-  const now=Date.now(), counts={};
-  Object.values(state.events).forEach(e=>{ const o=occ(e,now); if(!o.ended&&!isDone(e,o)) counts[e.game]=(counts[e.game]||0)+1; });
-  const gs=gamesSorted();
-  $('gameList').innerHTML = gs.length ? gs.map(g=>`
-    <div class="game" data-editgame="${esc(g.id)}" title="Edit game">
-      <span class="sw" style="background:${esc(g.color)}"></span><span class="nm">${esc(g.name)}</span>
-      <span class="cnt">${counts[g.id]||0} active</span><span class="cnt">✎</span>
-    </div>`).join('') : '<div class="hint" style="margin:0">Add the games you play first.</div>';
-  const sel=$('fGame'), cur=sel.value;
+const QUICK = {
+  '24h': {label:'Ending within 24h', test:(x,now)=>!x.o.ended&&!isDone(x.e,x.o)&&x.o.end-now<D},
+  '3d':  {label:'Ending within 3 days', test:(x,now)=>!x.o.ended&&!isDone(x.e,x.o)&&x.o.end-now<3*D},
+  'open':{label:'To do', test:(x)=>!x.o.ended&&!isDone(x.e,x.o)},
+  'done':{label:'Done', test:(x)=>!x.o.ended&&isDone(x.e,x.o)},
+};
+
+function openCounts(now){
+  const c={}, hot={};
+  Object.values(state.events).forEach(e=>{ const o=occ(e,now); if(!o.ended&&!isDone(e,o)){ c[e.game]=(c[e.game]||0)+1; if(o.end-now<D) hot[e.game]=1; } });
+  return {c,hot};
+}
+
+function renderGameSelect(){
+  const gs=gamesSorted(), sel=$('fGame'), cur=sel.value;
   sel.innerHTML = gs.length ? gs.map(g=>`<option value="${esc(g.id)}">${esc(g.name)}</option>`).join('') : '<option value="">— add a game first —</option>';
   if(cur && state.games[cur]) sel.value=cur;
   updateServerTz();
 }
 
-function renderResets(){
-  const now=Date.now();
-  const gs=gamesSorted().filter(g=>nextDaily(g,now)||nextWeekly(g,now));
-  if(!gs.length){ $('resets').innerHTML=''; return; }
-  $('resets').innerHTML = `<div class="section">Resets</div><div class="resets">` + gs.map(g=>{
-    const dl=nextDaily(g,now), wk=nextWeekly(g,now), done=dl&&g.dailyDoneFor===dl;
-    return `<div class="reset" style="--c:${esc(g.color)}">
-      <div class="rn"><span>${esc(g.name)}</span>${dl?`<button class="daily ${done?'on':''}" data-daily="${esc(g.id)}">${done?'Dailies ✓':'Dailies'}</button>`:''}</div>
-      ${dl?`<div class="rl"><span>Daily</span><b data-t="${dl}">${fmtLeft(dl-now)}</b></div>`:''}
-      ${wk?`<div class="rl"><span>Weekly</span><b data-t="${wk}">${fmtLeft(wk-now)}</b></div>`:''}
-    </div>`;}).join('') + `</div>`;
+function renderTabs(){
+  if(state.filter!=='all' && !state.games[state.filter]) state.filter='all';
+  const gs=gamesSorted(), {c,hot}=openCounts(Date.now());
+  const total=Object.values(c).reduce((a,b)=>a+b,0);
+  $('tabs').innerHTML = (gs.length?
+    `<button class="tab all ${state.filter==='all'?'on':''}" data-filter="all">All <span class="n">${total}</span></button>` +
+    gs.map(g=>`<button class="tab ${state.filter===g.id?'on':''}" style="--c:${esc(g.color)}" data-filter="${esc(g.id)}">
+      <span class="sw"></span>${esc(g.name)}<span class="n ${hot[g.id]?'hot':''}">${c[g.id]||0}</span>
+      <span class="gear" data-editgame="${esc(g.id)}" title="Edit game settings">⚙</span></button>`).join('') : '') +
+    `<button class="tab add" data-action="addgame">+ Add game</button>`;
 }
 
-function renderToolbar(){
-  if(state.filter!=='all' && !state.games[state.filter]) state.filter='all';
-  const now=Date.now(), anyEnded=Object.values(state.events).some(e=>occ(e,now).ended);
-  $('toolbar').innerHTML =
-    `<button class="chip ${state.filter==='all'?'on':''}" data-filter="all">All games</button>` +
-    gamesSorted().map(g=>`<button class="chip ${state.filter===g.id?'on':''}" data-filter="${esc(g.id)}"><span class="sw" style="background:${esc(g.color)}"></span>${esc(g.name)}</button>`).join('') +
-    `<span class="spacer"></span><label class="toggle"><input type="checkbox" id="showDone" ${state.showDone?'checked':''}> Show done & ended</label>` +
-    (anyEnded?`<button class="chip" id="clearEnded">Clear ended</button>`:'');
+function renderResets(){
+  const now=Date.now();
+  const gs=gamesSorted().filter(g=>(state.filter==='all'||g.id===state.filter)&&(nextDaily(g,now)||nextWeekly(g,now)));
+  if(!gs.length){ $('resets').innerHTML=''; return; }
+  $('resets').innerHTML = `<div class="section" style="margin-top:0">Resets</div><div class="resets">` + gs.map(g=>{
+    const dl=nextDaily(g,now), wk=nextWeekly(g,now), done=dl&&g.dailyDoneFor===dl;
+    return `<div class="reset" style="--c:${esc(g.color)}">
+      <div class="rn"><span>${esc(g.name)}</span>${dl?`<button class="daily ${done?'on':''}" data-daily="${esc(g.id)}" title="Mark today's dailies as done">${done?'Dailies ✓':'Dailies'}</button>`:''}</div>
+      ${dl?`<div class="rl"><span>Daily reset</span><b data-t="${dl}">${fmtLeft(dl-now)}</b></div>`:''}
+      ${wk?`<div class="rl"><span>Weekly reset</span><b data-t="${wk}">${fmtLeft(wk-now)}</b></div>`:''}
+    </div>`;}).join('') + `</div>`;
 }
 
 function evHtml(e,now){
@@ -185,12 +195,12 @@ function evHtml(e,now){
   const cls=['ev',done?'done':'',o.ended?'ended':'',(!done&&!o.ended&&u==='red')?'soon':''].join(' ');
   const goal=+e.goal||0, cnt=getCount(e,o), checks=getChecks(e,o), list=e.checklist||[];
   let extra='';
-  if(goal>0) extra+=`<div class="counter"><button data-cnt="${esc(e.id)}" data-d="-1">−</button><b>${cnt}/${goal}</b><button data-cnt="${esc(e.id)}" data-d="1">+</button><span class="pbar"><i style="width:${Math.round(cnt/goal*100)}%"></i></span></div>`;
+  if(goal>0) extra+=`<div class="counter"><button data-cnt="${esc(e.id)}" data-d="-1" aria-label="Minus one">−</button><b>${cnt}/${goal}</b><button data-cnt="${esc(e.id)}" data-d="1" aria-label="Plus one">+</button><span class="pbar"><i style="width:${Math.round(cnt/goal*100)}%"></i></span></div>`;
   if(list.length) extra+=`<div class="cl">${list.map((t,i)=>{const on=checks.includes(i);return `<label class="${on?'ck':''}"><input type="checkbox" data-chk="${esc(e.id)}" data-i="${i}" ${on?'checked':''}><span>${esc(t)}</span></label>`;}).join('')}</div>`;
   if(e.note) extra+=`<div class="note">${esc(e.note)}</div>`;
   if(!o.ended&&!done) extra+=`<div class="bar"><i style="width:${pct.toFixed(1)}%"></i></div>`;
   return `<div class="${cls}" style="--c:${esc(g.color)}">
-    <button class="chk ${done?'on':''}" data-toggle="${esc(e.id)}" title="Mark done">${done?'✓':''}</button>
+    <button class="chk ${done?'on':''}" data-toggle="${esc(e.id)}" title="${done?'Mark as not done':'Mark as done'}">${done?'✓':''}</button>
     <div>
       <div class="t"><span class="nm">${esc(e.name)}</span>
         ${e.prio==='must'?'<span class="tag must">Must-do</span>':''}${e.prio==='low'?'<span class="tag low">Low</span>':''}
@@ -205,38 +215,62 @@ function evHtml(e,now){
   </div>`;
 }
 
+function emptyState(){
+  const hasGames=gamesSorted().length, hasEvents=Object.keys(state.events).length;
+  const step=(n,txt,st)=>`<span class="${st}"><i>${st==='ok'?'✓':n}</i>${txt}</span>`;
+  if(!hasGames) return `<div class="empty"><div class="emoji">🎮</div><h3>Welcome! Let's set up your games</h3>
+    <p>Add the games you play, then add their limited-time events.</p>
+    <div class="steps">${step(1,'Add a game','cur')}${step(2,'Add events','')}${step(3,'Never miss one','')}</div>
+    <button class="btn" data-action="addgame">+ Add your first game</button></div>`;
+  if(!hasEvents) return `<div class="empty"><div class="emoji">📅</div><h3>Now add an event</h3>
+    <p>Copy the countdown from the game, like “6d 14h left”.</p>
+    <div class="steps">${step(1,'Add a game','ok')}${step(2,'Add events','cur')}${step(3,'Never miss one','')}</div>
+    <button class="btn" data-action="newevent">+ New event</button></div>`;
+  const gname=state.filter!=='all'&&state.games[state.filter]?state.games[state.filter].name:null;
+  return `<div class="empty"><div class="emoji">✅</div><h3>All caught up${gname?` in ${esc(gname)}`:''}!</h3>
+    <p>Nothing left to do right now.</p><button class="btn" data-action="newevent">+ New event</button></div>`;
+}
+
 function renderList(){
   const now=Date.now();
   const evs=Object.values(state.events).filter(e=>state.filter==='all'||e.game===state.filter).map(e=>({e,o:occ(e,now)}));
-  const byEnd=(a,b)=>a.o.end-b.o.end;
+  const byEnd=(a,b)=>a.o.end-b.o.end, draw=arr=>arr.map(x=>evHtml(x.e,now)).join('');
+  const ended=evs.filter(x=>x.o.ended).sort((a,b)=>b.o.end-a.o.end);
+  const doneOpen=evs.filter(x=>!x.o.ended&&isDone(x.e,x.o)).sort(byEnd);
+  $('clearEnded').hidden=!Object.values(state.events).some(e=>occ(e,now).ended);
+
+  if(state.quick){
+    const q=QUICK[state.quick], rows=evs.filter(x=>q.test(x,now)).sort(byEnd);
+    $('quickInfo').innerHTML=`Showing <b>${q.label}</b> <button class="chip" data-quick="${state.quick}">✕ Clear</button>`;
+    $('list').innerHTML = rows.length ? draw(rows) : `<div class="empty"><p style="margin:0">Nothing here.</p></div>`;
+    return;
+  }
+  $('quickInfo').innerHTML='';
   const open=evs.filter(x=>!x.o.ended&&!isDone(x.e,x.o)).sort(byEnd);
   const must=open.filter(x=>x.e.prio==='must'), rest=open.filter(x=>x.e.prio!=='must');
-  const doneOpen=evs.filter(x=>!x.o.ended&&isDone(x.e,x.o)).sort(byEnd);
-  const ended=evs.filter(x=>x.o.ended).sort((a,b)=>b.o.end-a.o.end);
-  const draw=arr=>arr.map(x=>evHtml(x.e,now)).join('');
   let html='';
-  if(!open.length) html+=`<div class="empty">${gamesSorted().length?'Nothing left to do. Add an event on the left.':'Start by adding your games, then add their events.'}</div>`;
+  if(!open.length) html+=emptyState();
   else if(must.length) html+=`<div class="section">🔥 Must-do</div>${draw(must)}${rest.length?`<div class="section">Other events</div>${draw(rest)}`:''}`;
-  else html+=`<div class="section">Events</div>${draw(rest)}`;
+  else html+=draw(rest);
   if(state.showDone){
     if(doneOpen.length) html+=`<div class="section">Done (still running)</div>${draw(doneOpen)}`;
     if(ended.length) html+=`<div class="section">Ended</div>${draw(ended)}`;
-  }else if(doneOpen.length||ended.length){
-    html+=`<div class="hint" style="text-align:center;margin-top:10px">${doneOpen.length} done · ${ended.length} ended — tick “Show done & ended” to see them.</div>`;
+  }else if(open.length && (doneOpen.length||ended.length)){
+    html+=`<div class="hint" style="text-align:center;margin-top:10px">${doneOpen.length} done · ${ended.length} ended (hidden)</div>`;
   }
   $('list').innerHTML=html;
 }
 
 function renderStats(){
-  const now=Date.now(), all=Object.values(state.events).map(e=>({e,o:occ(e,now)}));
-  const open=all.filter(x=>!x.o.ended&&!isDone(x.e,x.o));
-  $('sToday').textContent=open.filter(x=>x.o.end-now<D).length;
-  $('sWeek').textContent=open.filter(x=>x.o.end-now<3*D).length;
-  $('sActive').textContent=open.length;
-  $('sDone').textContent=all.filter(x=>!x.o.ended&&isDone(x.e,x.o)).length;
+  const now=Date.now(), all=Object.values(state.events).filter(e=>state.filter==='all'||e.game===state.filter).map(e=>({e,o:occ(e,now)}));
+  $('sToday').textContent=all.filter(x=>QUICK['24h'].test(x,now)).length;
+  $('sWeek').textContent=all.filter(x=>QUICK['3d'].test(x,now)).length;
+  $('sActive').textContent=all.filter(x=>QUICK.open.test(x,now)).length;
+  $('sDone').textContent=all.filter(x=>QUICK.done.test(x,now)).length;
+  document.querySelectorAll('.stat').forEach(b=>b.classList.toggle('on',b.dataset.quick===state.quick));
 }
 
-function renderAll(){ renderGames(); renderResets(); renderToolbar(); renderList(); renderStats(); }
+function renderAll(){ renderGameSelect(); renderTabs(); renderResets(); renderList(); renderStats(); }
 
 function tick(){
   const now=Date.now(); let crossed=false;
@@ -248,6 +282,14 @@ function tick(){
   });
   if(crossed) renderAll();
 }
+
+/* ---------------- Modals & menu ---------------- */
+const openModal = id => { $(id).classList.add('show'); };
+const closeModal = id => { $(id).classList.remove('show'); };
+function closeMenu(){ $('menu').hidden=true; }
+$('menuBtn').onclick=e=>{ e.stopPropagation(); $('menu').hidden=!$('menu').hidden; };
+document.addEventListener('click',e=>{ if(!e.target.closest('.menu-wrap')) closeMenu(); });
+document.querySelectorAll('.modal').forEach(m=>m.addEventListener('mousedown',e=>{ if(e.target===m && m.id!=='confirm') m.classList.remove('show'); }));
 
 /* ---------------- Event form ---------------- */
 function setMode(m){
@@ -266,27 +308,36 @@ function resetForm(){
   state.editId=null;
   ['fName','fNote','fD','fH','fM','fEnd','fGoal','fChecklist','fRepeatDays'].forEach(id=>$(id).value='');
   $('fServer').checked=false; setRepeatField(0); setPrio('normal'); setMode('left');
-  $('fErr').textContent=''; $('formTitle').textContent='Add event'; $('fSubmit').textContent='Add event'; $('fCancel').hidden=true;
+  $('fErr').textContent=''; $('formTitle').textContent='New event'; $('fSubmit').textContent='Add event';
   $('moreOpts').open=false;
+}
+function newEvent(){
+  if(!gamesSorted().length){ toast('Add a game first.'); return openGame(null); }
+  resetForm();
+  const pick = state.filter!=='all' ? state.filter : state.lastGame;
+  if(pick && state.games[pick]) $('fGame').value=pick;
+  updateServerTz(); openModal('eventModal'); setTimeout(()=>$('fName').focus(),50);
 }
 function startEdit(id){
   const e=state.events[id]; if(!e) return;
+  resetForm();
   const o=occ(e,Date.now());
   state.editId=id;
   $('fGame').value=e.game; $('fName').value=e.name; $('fNote').value=e.note||'';
   $('fGoal').value=+e.goal||''; $('fChecklist').value=(e.checklist||[]).join('\n');
   setRepeatField(+e.repeat||0); setPrio(e.prio||'normal');
-  setMode('date'); $('fEnd').value=toLocalInput(o.end); $('fServer').checked=false; updateServerTz();
+  setMode('date'); $('fEnd').value=toLocalInput(o.end); updateServerTz();
   $('moreOpts').open = !!(+e.repeat||+e.goal||(e.checklist||[]).length||e.note);
-  $('formTitle').textContent='Edit event'; $('fSubmit').textContent='Save changes'; $('fCancel').hidden=false;
-  window.scrollTo({top:0,behavior:'smooth'}); $('fName').focus();
+  $('formTitle').textContent='Edit event'; $('fSubmit').textContent='Save changes';
+  openModal('eventModal');
 }
 
 $('modeSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) setMode(b.dataset.m); });
 $('prioSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) setPrio(b.dataset.p); });
 $('fGame').addEventListener('change',updateServerTz);
 $('fRepeat').addEventListener('change',()=>{ $('customRepeat').hidden=$('fRepeat').value!=='custom'; });
-$('fCancel').addEventListener('click',resetForm);
+$('newEventBtn').onclick=newEvent;
+$('fab').onclick=newEvent;
 
 $('evForm').addEventListener('submit',async ev=>{
   ev.preventDefault();
@@ -308,7 +359,7 @@ $('evForm').addEventListener('submit',async ev=>{
     }else end=new Date(v).getTime();
     if(isNaN(end)) return err('That date looks invalid.');
   }
-  let repeat=$('fRepeat').value==='custom' ? Math.round(+$('fRepeatDays').value||0) : +$('fRepeat').value;
+  const repeat=$('fRepeat').value==='custom' ? Math.round(+$('fRepeatDays').value||0) : +$('fRepeat').value;
   if($('fRepeat').value==='custom' && repeat<1) return err('Enter how many days between repeats.');
   const goal=Math.max(0,Math.round(+$('fGoal').value||0));
   const checklist=$('fChecklist').value.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,30);
@@ -321,7 +372,8 @@ $('evForm').addEventListener('submit',async ev=>{
   };
   if(old && JSON.stringify(old.checklist||[])!==JSON.stringify(checklist)) e.checks=[];
   state.events[e.id]=e;
-  const wasEdit=!!old; resetForm(); $('fGame').value=game; renderAll();
+  state.lastGame=game;
+  const wasEdit=!!old; closeModal('eventModal'); resetForm(); state.quick=null; renderAll();
   await store.saveEvent(e);
   toast(wasEdit?'Event updated':'Event added');
 });
@@ -346,11 +398,9 @@ function openGame(id){
   $('gDaily').value=g?(g.dailyHour??''):'4';
   $('gWeekly').value=g?(g.weeklyDay??''):'1';
   $('gErr').textContent=''; $('gDelete').hidden=!g;
-  $('gameModal').classList.add('show'); $('gName').focus();
+  openModal('gameModal'); setTimeout(()=>$('gName').focus(),50);
 }
-const closeGame=()=>$('gameModal').classList.remove('show');
-$('addGameBtn').onclick=()=>openGame(null);
-$('gCancel').onclick=closeGame;
+const closeGame=()=>closeModal('gameModal');
 $('gForm').addEventListener('submit',async ev=>{
   ev.preventDefault();
   if(!store) return toast('Still loading…');
@@ -363,6 +413,7 @@ $('gForm').addEventListener('submit',async ev=>{
     offset:+$('gOffset').value, dailyHour:num($('gDaily').value), weeklyDay:num($('gWeekly').value),
     created:old?.created||Date.now()};
   state.games[g.id]=g; closeGame(); renderAll(); if(!old) $('fGame').value=g.id; updateServerTz();
+  toast(old?'Game updated':'Game added');
   await store.saveGame(g);
 });
 $('gDelete').onclick=()=>{
@@ -381,21 +432,26 @@ function ask(title,msg,fn,yes='Delete'){ $('cTitle').textContent=title; $('cMsg'
 $('cNo').onclick=()=>{ $('confirm').classList.remove('show'); confirmFn=null; };
 $('cYes').onclick=async()=>{ $('confirm').classList.remove('show'); const f=confirmFn; confirmFn=null; if(f) await f(); };
 
-/* ---------------- Clicks on the list ---------------- */
+/* ---------------- Clicks ---------------- */
 async function updateEvent(id,fn){ const e=state.events[id]; if(!e) return; const n=fn({...e},occ(e,Date.now())); state.events[id]=n; renderAll(); await store.saveEvent(n); }
 
 document.addEventListener('click',async ev=>{
-  const t=ev.target.closest('[data-toggle],[data-edit],[data-del],[data-filter],[data-editgame],[data-daily],[data-cnt],#clearEnded');
+  const close=ev.target.closest('[data-close]');
+  if(close){ closeModal(close.dataset.close); return; }
+  const t=ev.target.closest('[data-toggle],[data-edit],[data-del],[data-editgame],[data-filter],[data-daily],[data-cnt],[data-action],[data-quick],#clearEnded');
   if(!t) return;
-  if(!store && !t.dataset.filter) return toast('Still loading…');
   const d=t.dataset;
-  if(d.toggle) await updateEvent(d.toggle,(e,o)=>{ e.doneFor=isDone(e,o)?null:o.end; return e; });
+  if(d.quick){ state.quick = state.quick===d.quick ? null : d.quick; renderList(); renderStats(); return; }
+  if(d.filter && !d.editgame){ state.filter=d.filter; renderTabs(); renderResets(); renderList(); renderStats(); return; }
+  if(!store) return toast('Still loading…');
+  if(d.editgame){ ev.stopPropagation(); openGame(d.editgame); }
+  else if(d.action==='addgame') openGame(null);
+  else if(d.action==='newevent') newEvent();
+  else if(d.toggle) await updateEvent(d.toggle,(e,o)=>{ e.doneFor=isDone(e,o)?null:o.end; return e; });
   else if(d.cnt) await updateEvent(d.cnt,(e,o)=>{ e.count=Math.max(0,Math.min(+e.goal||0,getCount(e,o)+(+d.d))); e.countFor=o.end; return e; });
   else if(d.edit) startEdit(d.edit);
   else if(d.del){ const e=state.events[d.del]; if(!e) return;
-    ask('Delete event?',`“${e.name}” will be removed.`,async()=>{ delete state.events[e.id]; if(state.editId===e.id) resetForm(); renderAll(); await store.deleteEvent(e.id); }); }
-  else if(d.filter){ state.filter=d.filter; renderToolbar(); renderList(); }
-  else if(d.editgame) openGame(d.editgame);
+    ask('Delete event?',`“${e.name}” will be removed.`,async()=>{ delete state.events[e.id]; renderAll(); await store.deleteEvent(e.id); }); }
   else if(d.daily){ const g=state.games[d.daily]; if(!g) return; const dl=nextDaily(g,Date.now());
     const n={...g, dailyDoneFor: g.dailyDoneFor===dl?null:dl}; state.games[g.id]=n; renderAll(); await store.saveGame(n); }
   else if(t.id==='clearEnded'){ const now=Date.now(), ended=Object.values(state.events).filter(e=>occ(e,now).ended);
@@ -407,10 +463,15 @@ document.addEventListener('change',async ev=>{
   else if(t.dataset.chk){ const i=+t.dataset.i;
     await updateEvent(t.dataset.chk,(e,o)=>{ const c=new Set(getChecks(e,o)); t.checked?c.add(i):c.delete(i); e.checks=[...c].sort((a,b)=>a-b); e.checkFor=o.end; return e; }); }
 });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeGame(); $('confirm').classList.remove('show'); } });
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){ ['eventModal','gameModal','confirm'].forEach(closeModal); closeMenu(); return; }
+  const typing=/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+  if(!typing && (e.key==='n'||e.key==='N') && !document.querySelector('.modal.show') && !$('app').hidden){ e.preventDefault(); newEvent(); }
+});
 
 /* ---------------- Backup ---------------- */
 $('exportBtn').onclick=()=>{
+  closeMenu();
   const data=JSON.stringify({app:'game-event-tracker',version:2,exported:new Date().toISOString(),games:state.games,events:state.events},null,2);
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));
@@ -418,6 +479,7 @@ $('exportBtn').onclick=()=>{
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 };
 $('importFile').addEventListener('change',async ev=>{
+  closeMenu();
   const file=ev.target.files[0]; ev.target.value=''; if(!file) return;
   let d; try{ d=JSON.parse(await file.text()); }catch(e){ return toast('That file is not a valid backup.'); }
   if(!d || d.app!=='game-event-tracker' || typeof d.games!=='object' || typeof d.events!=='object') return toast('That file is not a tracker backup.');
@@ -440,6 +502,6 @@ setInterval(renderAll,60000);
     catch(e){ console.error(e); toast('Could not reach Firebase — using browser storage.'); }
   }
   store=localStore();
-  $('app').hidden=false;
+  $('app').hidden=false; $('fab').hidden=false;
   renderAll();
 })();

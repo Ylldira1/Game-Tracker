@@ -20,12 +20,22 @@
     <div class="head-right">
       <div class="sync"><span class="dot" id="syncDot"></span><span id="syncText">Loading…</span></div>
       <div id="userBox"></div>
+      <div class="menu-wrap">
+        <button class="icon-btn" id="menuBtn" title="More" aria-label="More options">⋯</button>
+        <div class="menu" id="menu" hidden>
+          <button id="exportBtn">⬇ Export backup</button>
+          <label class="menu-item">⬆ Import backup<input type="file" id="importFile" accept=".json,application/json" hidden></label>
+          <div class="menu-sep" id="signOutSep" hidden></div>
+          <button id="signOutBtn" hidden>Sign out</button>
+        </div>
+      </div>
     </div>
   </header>
 
   <!-- Sign-in screen (Firebase mode only) -->
   <div id="signin" class="signin" hidden>
     <div class="card">
+      <div class="big-emoji">🎮</div>
       <h2>Sign in to sync</h2>
       <p>Your events are saved to your account and show up on every device you sign in on.</p>
       <button class="btn" id="googleBtn">Sign in with Google</button>
@@ -35,111 +45,114 @@
 
   <main id="app" hidden>
     <div class="stats">
-      <div class="stat red"><b id="sToday">0</b><small>Ending within 24h</small></div>
-      <div class="stat amber"><b id="sWeek">0</b><small>Ending within 3 days</small></div>
-      <div class="stat"><b id="sActive">0</b><small>Active, not done</small></div>
-      <div class="stat green"><b id="sDone">0</b><small>Done</small></div>
+      <button class="stat red" data-quick="24h"><b id="sToday">0</b><small><span class="lg">Ending within </span>24h</small></button>
+      <button class="stat amber" data-quick="3d"><b id="sWeek">0</b><small><span class="lg">Ending within </span>3 days</small></button>
+      <button class="stat" data-quick="open"><b id="sActive">0</b><small>To do</small></button>
+      <button class="stat green" data-quick="done"><b id="sDone">0</b><small>Done</small></button>
     </div>
 
-    <div class="layout">
-      <aside>
-        <div class="card">
-          <h2 id="formTitle">Add event</h2>
-          <form id="evForm" autocomplete="off">
-            <label>Game</label>
-            <select id="fGame"></select>
-            <label>Event name</label>
-            <input id="fName" placeholder="e.g. Halloween Gacha Banner" maxlength="120">
-
-            <div class="seg" id="modeSeg">
-              <button type="button" data-m="left" class="on">Time left</button>
-              <button type="button" data-m="date">End date</button>
-            </div>
-            <div id="modeLeft">
-              <div class="row">
-                <div><label>Days</label><input id="fD" type="number" min="0" placeholder="0"></div>
-                <div><label>Hours</label><input id="fH" type="number" min="0" placeholder="0"></div>
-                <div><label>Minutes</label><input id="fM" type="number" min="0" placeholder="0"></div>
-              </div>
-              <div class="hint">Copy the countdown the game shows you.</div>
-            </div>
-            <div id="modeDate" hidden>
-              <label>Ends on</label>
-              <input id="fEnd" type="datetime-local">
-              <label class="inline"><input type="checkbox" id="fServer"> This is the game's <b>server time</b> <span id="fServerTz"></span></label>
-            </div>
-
-            <label>Priority</label>
-            <div class="seg" id="prioSeg">
-              <button type="button" data-p="must">🔥 Must-do</button>
-              <button type="button" data-p="normal" class="on">Normal</button>
-              <button type="button" data-p="low">Low</button>
-            </div>
-
-            <details id="moreOpts">
-              <summary>More options</summary>
-              <label>Repeats</label>
-              <select id="fRepeat">
-                <option value="0">Doesn't repeat</option>
-                <option value="1">Every day</option>
-                <option value="7">Every week</option>
-                <option value="14">Every 2 weeks</option>
-                <option value="21">Every 3 weeks</option>
-                <option value="28">Every 4 weeks</option>
-                <option value="42">Every 6 weeks</option>
-                <option value="custom">Custom…</option>
-              </select>
-              <div id="customRepeat" hidden>
-                <label>Repeat every (days)</label>
-                <input id="fRepeatDays" type="number" min="1" placeholder="e.g. 10">
-              </div>
-              <div class="hint">When it ends, the next round starts by itself and your progress resets.</div>
-
-              <label>Goal counter (optional)</label>
-              <input id="fGoal" type="number" min="0" placeholder="e.g. 5 shop items, 30 stages">
-
-              <label>Checklist (optional, one task per line)</label>
-              <textarea id="fChecklist" placeholder="Clear story&#10;Buy shop items&#10;Claim login rewards"></textarea>
-
-              <label>Notes</label>
-              <textarea id="fNote" placeholder="Rewards, currency to spend…" maxlength="500"></textarea>
-            </details>
-
-            <div class="err" id="fErr"></div>
-            <button class="btn" type="submit" id="fSubmit">Add event</button>
-            <button class="btn ghost" type="button" id="fCancel" hidden>Cancel edit</button>
-          </form>
-        </div>
-
-        <div class="card">
-          <h2>My games</h2>
-          <div class="games" id="gameList"></div>
-          <button class="btn ghost" id="addGameBtn">+ Add game</button>
-        </div>
-
-        <div class="card">
-          <h2>Backup</h2>
-          <div class="row">
-            <button class="btn ghost small" id="exportBtn">Export</button>
-            <label class="btn ghost small filebtn">Import<input type="file" id="importFile" accept=".json,application/json" hidden></label>
-          </div>
-          <div class="hint">Saves everything to a file, or loads it back.</div>
-        </div>
-      </aside>
-
-      <section>
-        <div id="resets"></div>
-        <div class="toolbar" id="toolbar"></div>
-        <div class="list" id="list"></div>
-      </section>
+    <div class="topbar">
+      <div class="tabs" id="tabs"></div>
+      <button class="btn primary-cta" id="newEventBtn">+ New event</button>
     </div>
+
+    <div id="resets"></div>
+
+    <div class="list-head">
+      <div class="quick" id="quickInfo"></div>
+      <span class="spacer"></span>
+      <label class="toggle"><input type="checkbox" id="showDone"> Show done & ended</label>
+      <button class="chip" id="clearEnded" hidden>Clear ended</button>
+    </div>
+    <div class="list" id="list"></div>
   </main>
+</div>
+
+<button class="fab" id="fab" aria-label="New event" hidden>+</button>
+
+<!-- Event editor -->
+<div class="modal" id="eventModal">
+  <div class="card">
+    <div class="modal-head">
+      <h2 id="formTitle">New event</h2>
+      <button class="icon-btn" type="button" data-close="eventModal" aria-label="Close">✕</button>
+    </div>
+    <form id="evForm" autocomplete="off">
+      <label>Game</label>
+      <select id="fGame"></select>
+      <label>Event name</label>
+      <input id="fName" placeholder="e.g. Halloween Gacha Banner" maxlength="120">
+
+      <label>When does it end?</label>
+      <div class="seg" id="modeSeg">
+        <button type="button" data-m="left" class="on">Time left</button>
+        <button type="button" data-m="date">End date</button>
+      </div>
+      <div id="modeLeft">
+        <div class="row">
+          <div><label>Days</label><input id="fD" type="number" min="0" inputmode="numeric" placeholder="0"></div>
+          <div><label>Hours</label><input id="fH" type="number" min="0" inputmode="numeric" placeholder="0"></div>
+          <div><label>Minutes</label><input id="fM" type="number" min="0" inputmode="numeric" placeholder="0"></div>
+        </div>
+        <div class="hint">Copy the countdown the game shows you.</div>
+      </div>
+      <div id="modeDate" hidden>
+        <input id="fEnd" type="datetime-local" style="margin-top:8px">
+        <label class="inline"><input type="checkbox" id="fServer"> This is the game's <b>server time</b> <span id="fServerTz"></span></label>
+      </div>
+
+      <label>Priority</label>
+      <div class="seg" id="prioSeg">
+        <button type="button" data-p="must">🔥 Must-do</button>
+        <button type="button" data-p="normal" class="on">Normal</button>
+        <button type="button" data-p="low">Low</button>
+      </div>
+
+      <details id="moreOpts">
+        <summary>Repeat, progress & notes</summary>
+        <label>Repeats</label>
+        <select id="fRepeat">
+          <option value="0">Doesn't repeat</option>
+          <option value="1">Every day</option>
+          <option value="7">Every week</option>
+          <option value="14">Every 2 weeks</option>
+          <option value="21">Every 3 weeks</option>
+          <option value="28">Every 4 weeks</option>
+          <option value="42">Every 6 weeks</option>
+          <option value="custom">Custom…</option>
+        </select>
+        <div id="customRepeat" hidden>
+          <label>Repeat every (days)</label>
+          <input id="fRepeatDays" type="number" min="1" placeholder="e.g. 10">
+        </div>
+        <div class="hint">When it ends, the next round starts by itself and your progress resets.</div>
+
+        <label>Goal counter</label>
+        <input id="fGoal" type="number" min="0" inputmode="numeric" placeholder="e.g. 5 shop items, 30 stages">
+
+        <label>Checklist (one task per line)</label>
+        <textarea id="fChecklist" placeholder="Clear story&#10;Buy shop items&#10;Claim login rewards"></textarea>
+
+        <label>Notes</label>
+        <textarea id="fNote" placeholder="Rewards, currency to spend…" maxlength="500"></textarea>
+      </details>
+
+      <div class="err" id="fErr"></div>
+      <div class="row" style="margin-top:16px">
+        <button class="btn ghost" type="button" data-close="eventModal">Cancel</button>
+        <button class="btn" type="submit" id="fSubmit">Add event</button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <!-- Game editor -->
 <div class="modal" id="gameModal">
   <div class="card">
-    <h2 id="gmTitle">Add game</h2>
+    <div class="modal-head">
+      <h2 id="gmTitle">Add game</h2>
+      <button class="icon-btn" type="button" data-close="gameModal" aria-label="Close">✕</button>
+    </div>
     <form id="gForm" autocomplete="off">
       <div class="row" style="align-items:flex-end">
         <div style="flex:4"><label>Name</label><input id="gName" maxlength="40" placeholder="e.g. Genshin Impact"></div>
@@ -152,11 +165,11 @@
         <div><label>Daily reset</label><select id="gDaily"></select></div>
         <div><label>Weekly reset</label><select id="gWeekly"></select></div>
       </div>
-      <div class="hint">Reset times are in server time. Many games reset at 4:00 AM.</div>
+      <div class="hint">In server time. Many games reset at 4:00 AM.</div>
       <div class="err" id="gErr"></div>
-      <div class="row" style="margin-top:14px">
-        <button class="btn ghost" type="button" id="gCancel" style="margin:0">Cancel</button>
-        <button class="btn" type="submit" style="margin:0">Save</button>
+      <div class="row" style="margin-top:16px">
+        <button class="btn ghost" type="button" data-close="gameModal">Cancel</button>
+        <button class="btn" type="submit">Save</button>
       </div>
       <button class="btn danger-link" type="button" id="gDelete" hidden>Remove this game</button>
     </form>
@@ -169,8 +182,8 @@
     <h2 id="cTitle">Are you sure?</h2>
     <div id="cMsg"></div>
     <div class="row" style="margin-top:16px">
-      <button class="btn ghost" style="margin:0" id="cNo">Cancel</button>
-      <button class="btn danger" style="margin:0" id="cYes">Delete</button>
+      <button class="btn ghost" id="cNo">Cancel</button>
+      <button class="btn danger" id="cYes">Delete</button>
     </div>
   </div>
 </div>
