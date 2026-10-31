@@ -90,10 +90,13 @@ async function firebaseStore(){
     $('signOutBtn').hidden=false; $('signOutSep').hidden=false;
     $('signOutBtn').onclick=()=>{ closeMenu(); signOut(auth); };
     setSync('warn','Connecting…');
-    const sub=(name,target)=>fs.onSnapshot(fs.collection(db,'users',u.uid,name),snap=>{
+    const live={};
+    const sub=(name,target)=>fs.onSnapshot(fs.collection(db,'users',u.uid,name),{includeMetadataChanges:true},snap=>{
       const out={}; snap.forEach(d=>{ out[d.id]={...d.data(),id:d.id}; });
       state[target]=out;
-      setSync(snap.metadata.fromCache?'warn':'ok', snap.metadata.fromCache?'Offline — will sync later':'Synced');
+      live[name]=!snap.metadata.fromCache;
+      if(live.games&&live.events) setSync('ok','Synced');
+      else setSync('warn', navigator.onLine?'Connecting…':'Offline — will sync later');
       renderAll();
     },err=>{ console.error(err); setSync('warn','Sync error: '+err.code); });
     unsubs.push(sub('games','games'), sub('events','events'));
