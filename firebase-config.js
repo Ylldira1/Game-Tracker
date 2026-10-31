@@ -1,18 +1,9 @@
-// ============================================================
-//  FIREBASE SETTINGS
-//  While this is null, the tracker saves to this browser only.
-//  To turn on sync, replace null with the config object that
-//  Firebase gives you (Project settings → Your apps → Web app).
-//  It looks like this:
-//
-//  export const firebaseConfig = {
-//    apiKey: "AIza...",
-//    authDomain: "your-project.firebaseapp.com",
-//    projectId: "your-project",
-//    storageBucket: "your-project.appspot.com",
-//    messagingSenderId: "1234567890",
-//    appId: "1:1234567890:web:abc123"
-//  };
-// ============================================================
-
-export const firebaseConfig = null;
+// Firebase settings for Game Event Tracker
+export const firebaseConfig = {
+  apiKey: "AIzaSyCRH2WiW7wm8MxDrhMvNC2LeMdnA3OslFg",
+  authDomain: "game-tracker-8f322.firebaseapp.com",
+  projectId: "game-tracker-8f322",
+  storageBucket: "game-tracker-8f322.firebasestorage.app",
+  messagingSenderId: "359529537592",
+  appId: "1:359529537592:web:83d451cd6d8a04190d06cd"
+};
