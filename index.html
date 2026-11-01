@@ -85,6 +85,7 @@
       <label>Game</label>
       <select id="fGame"></select>
       <div class="share-hint" id="shareHint" hidden></div>
+      <label class="inline priv-row" id="privRow" hidden><input type="checkbox" id="fPrivate"> 🔒 Only for me (don't share this quest)</label>
       <label>Type</label>
       <div class="seg type-seg" id="typeSeg">
         <button type="button" data-type="limited" class="on">⏳ Limited-time</button>
@@ -201,7 +202,20 @@
       <label>Monthly reset</label>
       <select id="gMonthly"></select>
       <div class="hint">In server time. Many games reset at 4:00 AM, monthly on the 1st.</div>
-      <label class="share-row" id="shareRow" hidden><input type="checkbox" id="gShare"> <span>📢 <b>Share with all users</b><br><small>Anyone can follow this game and get its quests automatically.</small></span></label>
+      <label class="share-row" id="shareRow" hidden><input type="checkbox" id="gShare"> <span>📢 <b>Share this game</b><br><small>Others can follow it and get its quests automatically.</small></span></label>
+      <div class="aud-box" id="audBox" hidden>
+        <label>Who can follow it?</label>
+        <div class="seg" id="audSeg">
+          <button type="button" data-aud="all" class="on">🌐 Everyone</button>
+          <button type="button" data-aud="some">👥 Only selected people</button>
+        </div>
+        <div id="audSome" hidden>
+          <div class="people" id="peopleList"></div>
+          <label>Or add by Google email</label>
+          <textarea id="gEmails" placeholder="friend@gmail.com&#10;one email per line"></textarea>
+          <div class="hint">People show up in the list after they sign in to the tracker once.</div>
+        </div>
+      </div>
       </fieldset>
       <div class="err" id="gErr"></div>
       <div class="row" style="margin-top:16px">

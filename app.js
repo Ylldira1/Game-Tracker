@@ -49,7 +49,9 @@ function localStore(){
 const ADMIN_EMAIL='darrebpphwork99@gmail.com';
 const PROG_E=['doneFor','count','countFor','checks','checkFor'];  // per-person quest progress
 const PROG_G=['dailyDoneFor'];                                   // per-person game progress
-const raw={games:{},events:{},progress:{},follow:{games:[],hidden:[]},sGames:{},sQuests:{}};
+const raw={games:{},events:{},progress:{},follow:{games:[],hidden:[]},sGames:{},sQuests:{},profiles:{}};
+const parts={};   // shared data arrives from several queries; merged into raw.sGames / raw.sQuests
+const audienceOf=g=>({audience:(g&&g.audience)||'all', emails:(g&&g.emails)||[]});
 let isAdmin=false, sharingOn=false;
 const pick=(o,keys)=>{ const r={}; keys.forEach(k=>{ if(o&&o[k]!==undefined) r[k]=o[k]; }); return r; };
 const omit=(o,keys)=>{ const r={...o}; keys.forEach(k=>delete r[k]); return r; };
@@ -111,7 +113,12 @@ async function firebaseStore(){
     saveGame(g){
       if(g.shared){
         const w=[set(U('progress',g.id),{dailyDoneFor:g.dailyDoneFor??null})];
-        if(isAdmin) w.push(set(S('sharedGames',g.id),omit(g,[...PROG_G,'shared'])));
+        if(isAdmin){
+          const prev=raw.sGames[g.id], aud=audienceOf(g);
+          w.push(set(S('sharedGames',g.id),{...omit(g,[...PROG_G,'shared']),...aud}));
+          if(prev && JSON.stringify(audienceOf(prev))!==JSON.stringify(aud))
+            Object.values(raw.sQuests).filter(q=>q.game===g.id).forEach(q=>w.push(set(S('sharedQuests',q.id),{...omit(q,['shared']),...aud})));
+        }
         return Promise.all(w).catch(fail);
       }
       return set(U('games',g.id),omit(g,['shared'])).catch(fail);
@@ -126,7 +133,7 @@ async function firebaseStore(){
     saveEvent(e){
       if(e.shared){
         const w=[set(U('progress',e.id),pick(e,PROG_E))];
-        if(isAdmin) w.push(set(S('sharedQuests',e.id),omit(e,[...PROG_E,'shared'])));
+        if(isAdmin) w.push(set(S('sharedQuests',e.id),{...omit(e,[...PROG_E,'shared']),...audienceOf(raw.sGames[e.game]||state.games[e.game])}));
         return Promise.all(w).catch(fail);
       }
       return set(U('events',e.id),omit(e,['shared'])).catch(fail);
@@ -146,18 +153,18 @@ async function firebaseStore(){
     async shareGame(g,on){
       try{
         if(on){
-          await set(S('sharedGames',g.id),omit(g,[...PROG_G,'shared']));
+          await set(S('sharedGames',g.id),{...omit(g,[...PROG_G,'shared']),...audienceOf(g)});
           await set(U('progress',g.id),{dailyDoneFor:g.dailyDoneFor??null});
-          for(const e of Object.values(raw.events).filter(e=>e.game===g.id)){
-            await set(S('sharedQuests',e.id),omit(e,[...PROG_E,'shared']));
+          for(const e of Object.values(raw.events).filter(e=>e.game===g.id && !e.private)){
+            await set(S('sharedQuests',e.id),{...omit(e,[...PROG_E,'shared','private']),...audienceOf(g)});
             await set(U('progress',e.id),pick(e,PROG_E));
             await del(U('events',e.id));
           }
           await del(U('games',g.id));
         }else{
-          await set(U('games',g.id),omit(g,['shared']));
+          await set(U('games',g.id),omit(g,['shared','audience','emails']));
           for(const q of Object.values(raw.sQuests).filter(q=>q.game===g.id)){
-            await set(U('events',q.id),{...omit(q,['shared']),...pick(raw.progress[q.id],PROG_E)});
+            await set(U('events',q.id),{...omit(q,['shared','audience','emails']),...pick(raw.progress[q.id],PROG_E)});
             await del(S('sharedQuests',q.id));
           }
           await del(S('sharedGames',g.id));
@@ -169,7 +176,8 @@ async function firebaseStore(){
   onAuthStateChanged(auth,u=>{
     unsubs.forEach(f=>f()); unsubs=[];
     user=u;
-    Object.assign(raw,{games:{},events:{},progress:{},follow:{games:[],hidden:[]},sGames:{},sQuests:{}});
+    Object.assign(raw,{games:{},events:{},progress:{},follow:{games:[],hidden:[]},sGames:{},sQuests:{},profiles:{}});
+    Object.keys(parts).forEach(k=>delete parts[k]);
     if(!u){
       state.games={}; state.events={};
       $('app').hidden=true; $('fab').hidden=true; $('signin').hidden=false; $('userBox').innerHTML='';
@@ -190,17 +198,44 @@ async function firebaseStore(){
       if(live.games&&live.events) setSync('ok','Synced');
       else setSync('warn', navigator.onLine?'Connecting…':'Offline — will sync later');
     };
-    const sub=(ref,key)=>fs.onSnapshot(ref,{includeMetadataChanges:true},snap=>{
+    const sub=(ref,key,part)=>fs.onSnapshot(ref,{includeMetadataChanges:true},snap=>{
       const out={}; snap.forEach(d=>{ out[d.id]={...d.data(),id:d.id}; });
-      raw[key]=out; live[key]=!snap.metadata.fromCache;
+      if(part){ parts[part]=out; raw[key]=Object.assign({},...Object.keys(parts).filter(p=>p.startsWith(key+':')).map(p=>parts[p])); }
+      else raw[key]=out;
+      live[key]=!snap.metadata.fromCache;
+      if(isAdmin && (key==='sGames'||key==='sQuests')) backfillAudience(key);
       compose(); status(); renderAll();
     },onErr);
+    // Shared data: the Super Admin reads everything; others read what's shared with everyone or with their email
+    const email=(u.email||'').toLowerCase();
+    const sharedSubs=col=>{
+      const key=col==='sharedGames'?'sGames':'sQuests';
+      if(isAdmin) return [sub(fs.collection(db,col),key)];
+      return [
+        sub(fs.query(fs.collection(db,col),fs.where('audience','==','all')),key,key+':all'),
+        sub(fs.query(fs.collection(db,col),fs.where('emails','array-contains',email)),key,key+':me'),
+      ];
+    };
+    // Shared items created before audiences existed: mark them "everyone" once
+    const backfilled=new Set();
+    function backfillAudience(key){
+      const col=key==='sGames'?'sharedGames':'sharedQuests';
+      Object.values(raw[key]).forEach(d=>{
+        if(d.audience||backfilled.has(d.id)) return;
+        backfilled.add(d.id);
+        const g=key==='sGames'?d:raw.sGames[d.game];
+        set(S(col,d.id),{...omit(d,['id']),...audienceOf(g)}).catch(fail);
+      });
+    }
+    // Let the Super Admin see who has signed in (for picking people to share with)
+    set(fs.doc(db,'profiles',u.uid),{email,name:u.displayName||'',photo:u.photoURL||'',lastSeen:Date.now()}).catch(()=>{});
     unsubs.push(
       sub(fs.collection(db,'users',u.uid,'games'),'games'),
       sub(fs.collection(db,'users',u.uid,'events'),'events'),
       sub(fs.collection(db,'users',u.uid,'progress'),'progress'),
-      sub(fs.collection(db,'sharedGames'),'sGames'),
-      sub(fs.collection(db,'sharedQuests'),'sQuests'),
+      ...sharedSubs('sharedGames'),
+      ...sharedSubs('sharedQuests'),
+      ...(isAdmin?[sub(fs.collection(db,'profiles'),'profiles')]:[]),
       fs.onSnapshot(U('meta','follow'),snap=>{
         const d=snap.exists()?snap.data():{};
         raw.follow={games:d.games||[],hidden:d.hidden||[]};
@@ -345,7 +380,7 @@ function renderTabs(){
   $('tabs').innerHTML = (gs.length?
     `<button class="tab all ${state.filter==='all'?'on':''}" data-filter="all">All games <span class="n">${total}</span></button>` +
     gs.map(g=>`<button class="tab ${state.filter===g.id?'on':''}" style="--c:${esc(g.color)}" data-filter="${esc(g.id)}">
-      <span class="sw"></span>${esc(g.name)}${g.shared?`<span class="shared-ic" title="${isAdmin?'Shared with everyone':'Followed from the Super Admin'}">${isAdmin?'📢':'🔗'}</span>`:''}<span class="n ${hot[g.id]?'hot':''}" ${hot[g.id]?'title="A limited-time quest ends within 24h"':''}>${c[g.id]||0}</span>
+      <span class="sw"></span>${esc(g.name)}${g.shared?`<span class="shared-ic" title="${!isAdmin?'Followed from the Super Admin':g.audience==='some'?'Shared with selected people':'Shared with everyone'}">${!isAdmin?'🔗':g.audience==='some'?'👥':'📢'}</span>`:''}<span class="n ${hot[g.id]?'hot':''}" ${hot[g.id]?'title="A limited-time quest ends within 24h"':''}>${c[g.id]||0}</span>
       <span class="gear" data-editgame="${esc(g.id)}" title="Game settings">⚙</span></button>`).join('') : '') +
     `<button class="tab add" data-action="addgame">+ Add game</button>`;
 }
@@ -386,7 +421,7 @@ function evHtml(e,now){
   return `<div class="${cls}" style="--c:${esc(g.color)}">
     <button class="chk ${done?'on':''}" data-toggle="${esc(e.id)}" title="${done?'Mark as not done':'Mark as done'}">${done?'✓':''}</button>
     <div class="body">
-      <div class="t"><span class="nm">${esc(e.name)}</span>
+      <div class="t"><span class="nm">${esc(e.name)}</span>${privTag(e)}
         ${e.prio==='must'?'<span class="tag must">🔥 Must-do</span>':''}${e.prio==='low'?'<span class="tag low">Low</span>':''}
         ${+e.repeat?`<span class="tag rep">↻ ${repeatLabel(+e.repeat)}</span>`:''}</div>
       <div class="meta"><span class="gname">${esc(g.name)}</span><span>${o.ended?'Ended':'Ends'} ${esc(fmtDate(o.end))}</span></div>
@@ -415,7 +450,7 @@ function rowHtml(x,showGame,showWhen){
   return `<div class="qrow ${done?'done':''}" style="--c:${esc(g.color)}">
     <button class="chk sm ${done?'on':''}" data-toggle="${esc(e.id)}" title="${done?'Mark as not done':'Mark as done'}">${done?'✓':''}</button>
     <div class="body">
-      <div class="t"><span class="nm">${esc(e.name)}</span>${showGame?`<span class="gpill"><span class="sw"></span>${esc(g.name)}</span>`:''}</div>
+      <div class="t"><span class="nm">${esc(e.name)}</span>${privTag(e)}${showGame?`<span class="gpill"><span class="sw"></span>${esc(g.name)}</span>`:''}</div>
       ${extra}
     </div>
     <div class="rright">
@@ -425,6 +460,10 @@ function rowHtml(x,showGame,showWhen){
   </div>`;
 }
 
+function privTag(e){
+  const g=state.games[e.game];
+  return isAdmin && e.private && g && g.shared ? '<span class="tag priv" title="Not shared with followers">🔒 Only me</span>' : '';
+}
 function actsHtml(e){
   if(!canEdit(e)) return `<div class="acts"><button class="del" data-del="${esc(e.id)}" title="Hide for me" aria-label="Hide for me">🙈</button></div>`;
   return `<div class="acts"><button data-edit="${esc(e.id)}" title="Edit" aria-label="Edit">✎</button><button class="del" data-del="${esc(e.id)}" title="Delete" aria-label="Delete">🗑</button></div>`;
@@ -584,9 +623,16 @@ function setType(t){
 }
 function updateTypeInfo(){
   const g=state.games[$('fGame').value];
-  const sh=$('shareHint');
-  if(g&&g.shared){ sh.hidden=false; sh.innerHTML=isAdmin?'📢 Shared game: everyone following it will get this quest.':'🔗 Followed game: this quest will be just for you.'; }
-  else sh.hidden=true;
+  const sh=$('shareHint'), adminShared=!!(isAdmin&&g&&g.shared);
+  $('privRow').hidden=!adminShared;
+  if(g&&g.shared){
+    sh.hidden=false;
+    if(!isAdmin) sh.innerHTML='🔗 Followed game: this quest will be just for you.';
+    else if($('fPrivate').checked) sh.innerHTML='🔒 Only you will see this quest.';
+    else sh.innerHTML=g.audience==='some'
+      ? `👥 Shared with ${(g.emails||[]).length} selected ${(g.emails||[]).length===1?'person':'people'}: they'll get this quest.`
+      : '📢 Shared with everyone who follows this game.';
+  }else sh.hidden=true;
   $('fServerTz').textContent=g?`(${fmtOffset(+g.offset||0)})`:'';
   const info=$('typeInfo');
   if(!g || state.type==='limited'){ info.hidden=true; return; }
@@ -607,7 +653,7 @@ function setRepeatField(r){
 function resetForm(){
   state.editId=null;
   ['fName','fNote','fD','fH','fM','fEnd','fGoal','fChecklist','fRepeatDays'].forEach(id=>$(id).value='');
-  $('fServer').checked=false; $('fMonthDay').value=''; setRepeatField(0); setPrio('normal'); setMode('left'); setType('limited'); updateLeftPreview();
+  $('fServer').checked=false; $('fMonthDay').value=''; $('fPrivate').checked=false; setRepeatField(0); setPrio('normal'); setMode('left'); setType('limited'); updateLeftPreview();
   $('fErr').textContent=''; $('formTitle').textContent='New quest'; $('fSubmit').textContent='Add quest';
   $('moreOpts').open=false;
 }
@@ -630,6 +676,7 @@ function startEdit(id){
   setRepeatField(+e.repeat||0); setPrio(e.prio||'normal');
   setMode('date'); $('fEnd').value=toLocalInput(o.end);
   $('fMonthDay').value=+e.monthDay?String(e.monthDay):'';
+  $('fPrivate').checked=!!e.private;
   setType(typeOf(e));
   $('moreOpts').open = !!(+e.repeat||+e.goal||(e.checklist||[]).length||e.note);
   $('formTitle').textContent='Edit quest'; $('fSubmit').textContent='Save changes';
@@ -641,6 +688,7 @@ $('prioSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); i
 $('typeSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) setType(b.dataset.type); });
 $('fGame').addEventListener('change',()=>{ updateTypeInfo(); updateLeftPreview(); fillMonthDay(); });
 $('fMonthDay').addEventListener('change',updateTypeInfo);
+$('fPrivate').addEventListener('change',updateTypeInfo);
 function fillMonthDay(){
   const sel=$('fMonthDay'), cur=sel.value, g=state.games[$('fGame').value];
   let h=`<option value="">Game default (${ordinal(resetCfg(g).monthlyDay)})</option>`;
@@ -697,7 +745,9 @@ $('evForm').addEventListener('submit',async ev=>{
     created: old && old.created < end ? old.created : Date.now(),
   };
   if(old && JSON.stringify(old.checklist||[])!==JSON.stringify(checklist)) e.checks=[];
-  e.shared = isAdmin && sharingOn ? !!(state.games[game]&&state.games[game].shared) : false;
+  const gObj=state.games[game], priv=!!(isAdmin && sharingOn && gObj && gObj.shared && $('fPrivate').checked);
+  e.private=priv;
+  e.shared = isAdmin && sharingOn ? !!(gObj&&gObj.shared) && !priv : false;
   if(old && !!old.shared!==e.shared){ delete state.events[old.id]; await store.deleteEvent(old.id,!!old.shared); }
   state.events[e.id]=e;
   state.lastGame=game;
@@ -737,6 +787,18 @@ function openGame(id){
   // Share toggle (Super Admin only)
   $('shareRow').hidden=!(isAdmin&&sharingOn);
   $('gShare').checked=!!(g&&g.shared);
+  if(isAdmin&&sharingOn){
+    const emails=(g&&g.emails)||[];
+    const people=Object.values(raw.profiles).filter(p=>p.email&&p.email!==ADMIN_EMAIL).sort((a,b)=>(a.name||a.email).localeCompare(b.name||b.email));
+    const known=new Set(people.map(p=>p.email));
+    $('peopleList').innerHTML=people.length?people.map(p=>`<label class="person"><input type="checkbox" value="${esc(p.email)}" ${emails.includes(p.email)?'checked':''}>
+      ${p.photo?`<img src="${esc(p.photo)}" alt="" referrerpolicy="no-referrer">`:`<span class="avatar sm">${esc((p.name||p.email).charAt(0).toUpperCase())}</span>`}
+      <span><b>${esc(p.name||p.email)}</b><small>${esc(p.email)}</small></span></label>`).join('')
+      :'<div class="hint" style="margin:0">No one else has signed in yet.</div>';
+    $('gEmails').value=emails.filter(e=>!known.has(e)).join('\n');
+    setAud((g&&g.audience)||'all');
+  }
+  $('audBox').hidden=!$('gShare').checked || $('shareRow').hidden;
   $('gName').value=g?g.name:'';
   $('gColor').value=g?g.color:PALETTE[Object.keys(state.games).length%PALETTE.length];
   $('gOffset').value=String(g?(+g.offset||0):Math.round(-new Date().getTimezoneOffset()/60));
@@ -750,6 +812,14 @@ function openGame(id){
   if(!ro && !avail.length) setTimeout(()=>{ if(!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) $('gName').focus(); },50);
 }
 const closeGame=()=>closeModal('gameModal');
+function setAud(a){ state.aud=a; document.querySelectorAll('#audSeg button').forEach(b=>b.classList.toggle('on',b.dataset.aud===a)); $('audSome').hidden=a!=='some'; }
+$('audSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) setAud(b.dataset.aud); });
+$('gShare').addEventListener('change',()=>{ $('audBox').hidden=!$('gShare').checked; });
+function chosenEmails(){
+  const ticked=[...document.querySelectorAll('#peopleList input:checked')].map(i=>i.value);
+  const typed=$('gEmails').value.split(/[\s,;]+/).map(x=>x.trim().toLowerCase()).filter(x=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));
+  return [...new Set([...ticked,...typed])];
+}
 $('gForm').addEventListener('submit',async ev=>{
   ev.preventDefault();
   if(!store) return toast('Still loading…');
@@ -763,6 +833,11 @@ $('gForm').addEventListener('submit',async ev=>{
     offset:+$('gOffset').value, dailyHour:num($('gDaily').value), weeklyDay:num($('gWeekly').value), monthlyDay:+$('gMonthly').value,
     created:old?.created||Date.now(), shared:!!(old&&old.shared)};
   const wantShare=isAdmin&&sharingOn&&$('gShare').checked;
+  if(wantShare){
+    g.audience=state.aud==='some'?'some':'all';
+    g.emails=g.audience==='some'?chosenEmails():[];
+    if(g.audience==='some'&&!g.emails.length) return $('gErr').textContent='Pick at least one person, or choose Everyone.';
+  }
   closeGame();
   if(isAdmin && sharingOn && wantShare!==g.shared){
     if(wantShare){

@@ -290,3 +290,14 @@ fieldset:disabled{opacity:.6}
 .followed-info{margin:10px 0 4px;font-size:13px;color:var(--muted);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;line-height:1.5}
 .followed-info .linkbtn{display:block;margin-top:6px;padding:2px 0}
 @media (max-width:760px){ .admin-badge{display:none} }
+.tag.priv{background:var(--panel2);color:var(--muted)}
+.priv-row{margin-top:8px}
+.aud-box{margin-top:4px}
+.people{display:flex;flex-direction:column;gap:6px;margin-top:10px;max-height:220px;overflow:auto}
+.person{display:flex;align-items:center;gap:10px;margin:0;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);cursor:pointer;color:var(--text)}
+.person input{width:auto;margin:0}
+.person img{width:28px;height:28px;border-radius:50%}
+.person span{display:flex;flex-direction:column;line-height:1.25;min-width:0}
+.person small{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis}
+.person:has(input:checked){border-color:var(--accent)}
+.avatar.sm{width:28px;height:28px;font-size:12px;flex:none}
