@@ -52,12 +52,17 @@
       <button class="stat green" data-quick="done"><b id="sDone">0</b><small>Done</small></button>
     </div>
 
-    <div class="topbar">
-      <div class="tabs" id="tabs"></div>
+    <div class="toolbar-row">
+      <div class="tb-title">Your games</div>
       <div class="top-actions">
         <button class="btn ghost secondary-cta" data-action="addgame">+ Add game</button>
         <button class="btn primary-cta" id="newEventBtn">+ New quest</button>
       </div>
+    </div>
+    <div class="tabs-wrap" id="tabsWrap">
+      <button class="tab-arrow left" id="tabsL" aria-label="Scroll games left">‹</button>
+      <div class="tabs" id="tabs"></div>
+      <button class="tab-arrow right" id="tabsR" aria-label="Scroll games right">›</button>
     </div>
 
     <div id="resets"></div>

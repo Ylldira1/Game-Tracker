@@ -398,9 +398,25 @@ function renderTabs(){
     `<button class="tab all ${state.filter==='all'?'on':''}" data-filter="all">All games <span class="n">${total}</span></button>` +
     gs.map(g=>`<button class="tab ${state.filter===g.id?'on':''}" style="--c:${esc(g.color)}" data-filter="${esc(g.id)}">
       <span class="sw"></span>${esc(g.name)}${g.shared?`<span class="shared-ic" title="${!isAdmin?'Followed from the Super Admin':g.audience==='some'?'Shared with selected people':'Shared with everyone'}">${!isAdmin?'🔗':g.audience==='some'?'👥':'📢'}</span>`:''}<span class="n ${hot[g.id]?'hot':''}" ${hot[g.id]?'title="A limited-time quest ends within 24h"':''}>${c[g.id]||0}</span>
-      <span class="gear" data-editgame="${esc(g.id)}" title="Game settings">⚙</span></button>`).join('') : '') +
+      ${state.filter===g.id?`<span class="gear" data-editgame="${esc(g.id)}" title="Game settings">⚙</span>`:''}</button>`).join('') : '') +
     `<button class="tab add" data-action="addgame">+ Add game</button>`;
+  requestAnimationFrame(()=>{ const on=$('tabs').querySelector('.tab.on'); if(on && state.filter!=='all') on.scrollIntoView({block:'nearest',inline:'center'}); updateTabArrows(); });
 }
+
+// Game tabs: one scrollable line with arrows + faded edges when it overflows
+function updateTabArrows(){
+  const t=$('tabs'), w=$('tabsWrap');
+  w.classList.toggle('can-l', t.scrollLeft>2);
+  w.classList.toggle('can-r', t.scrollLeft+t.clientWidth<t.scrollWidth-2);
+}
+$('tabs').addEventListener('scroll',updateTabArrows,{passive:true});
+window.addEventListener('resize',updateTabArrows);
+$('tabsL').onclick=()=>$('tabs').scrollBy({left:-260});
+$('tabsR').onclick=()=>$('tabs').scrollBy({left:260});
+$('tabs').addEventListener('wheel',e=>{
+  const t=$('tabs'); if(t.scrollWidth<=t.clientWidth || Math.abs(e.deltaX)>Math.abs(e.deltaY)) return;
+  e.preventDefault(); t.scrollLeft+=e.deltaY;
+},{passive:false});
 
 function renderResets(){
   const now=Date.now();
