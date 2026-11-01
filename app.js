@@ -441,13 +441,13 @@ function evHtml(e,now){
   const extra=progressHtml(e,o) + (e.note?`<div class="note">${esc(e.note)}</div>`:'');
   return `<div class="${cls}" style="--c:${esc(g.color)}">
     <button class="chk ${done?'on':''}" data-toggle="${esc(e.id)}" title="${done?'Mark as not done':'Mark as done'}">${done?'✓':''}</button>
-    <div class="body">
+    <div class="body ${e.img?'has-img':''}">${thumbHtml(e)}<div class="btext">
       <div class="t"><span class="nm">${esc(e.name)}</span>${privTag(e)}
         ${e.prio==='must'?'<span class="tag must">🔥 Must-do</span>':''}${e.prio==='low'?'<span class="tag low">Low</span>':''}
         ${+e.repeat?`<span class="tag rep">↻ ${repeatLabel(+e.repeat)}</span>`:''}</div>
       <div class="meta"><span class="gname">${esc(g.name)}</span><span>${o.ended?'Ended':'Ends'} ${esc(fmtDate(o.end))}</span></div>
       ${extra}
-    </div>
+    </div></div>
     <div class="right">
       <span class="cd ${done?'gray':u}" ${done?'':`data-t="${o.end}"`}>${done&&!o.ended?'Done ✓':fmtLeft(left)}</span>
       ${actsHtml(e)}
@@ -456,6 +456,10 @@ function evHtml(e,now){
   </div>`;
 }
 
+function thumbHtml(e,cls=''){
+  if(!e.img || !String(e.img).startsWith('data:image/')) return '';
+  return `<button class="qthumb ${cls}" data-zoom="${esc(e.id)}" title="View image"><img src="${esc(e.img)}" alt=""></button>`;
+}
 function progressHtml(e,o){
   const goal=+e.goal||0, cnt=getCount(e,o), checks=getChecks(e,o), list=e.checklist||[];
   let h='';
@@ -470,10 +474,10 @@ function rowHtml(x,showGame,showWhen){
   const extra=progressHtml(e,o)+(e.note?`<div class="note">${esc(e.note)}</div>`:'');
   return `<div class="qrow ${done?'done':''}" style="--c:${esc(g.color)}">
     <button class="chk sm ${done?'on':''}" data-toggle="${esc(e.id)}" title="${done?'Mark as not done':'Mark as done'}">${done?'✓':''}</button>
-    <div class="body">
+    <div class="body ${e.img?'has-img sm':''}">${thumbHtml(e,'sm')}<div class="btext">
       <div class="t"><span class="nm">${esc(e.name)}</span>${privTag(e)}${showGame?`<span class="gpill"><span class="sw"></span>${esc(g.name)}</span>`:''}</div>
       ${extra}
-    </div>
+    </div></div>
     <div class="rright">
       ${showWhen?timeChip(o.end, done, typeOf(e)):''}
       ${actsHtml(e)}
@@ -674,6 +678,7 @@ function setRepeatField(r){
 function resetForm(){
   state.editId=null;
   ['fName','fNote','fD','fH','fM','fEnd','fGoal','fChecklist','fRepeatDays'].forEach(id=>$(id).value='');
+  state.imgDraft=''; renderImgField();
   $('fServer').checked=false; $('fMonthDay').value=''; $('fPrivate').checked=false; setRepeatField(0); setPrio('normal'); setMode('left'); setType('limited'); updateLeftPreview();
   $('fErr').textContent=''; $('formTitle').textContent='New quest'; $('fSubmit').textContent='Add quest';
   $('moreOpts').open=false;
@@ -694,6 +699,7 @@ function startEdit(id){
   state.editId=id;
   $('fGame').value=e.game; fillMonthDay(); $('fName').value=e.name; $('fNote').value=e.note||'';
   $('fGoal').value=+e.goal||''; $('fChecklist').value=(e.checklist||[]).join('\n');
+  state.imgDraft=e.img||''; renderImgField();
   setRepeatField(+e.repeat||0); setPrio(e.prio||'normal');
   setMode('date'); $('fEnd').value=toLocalInput(o.end);
   $('fMonthDay').value=+e.monthDay?String(e.monthDay):'';
@@ -766,6 +772,7 @@ $('evForm').addEventListener('submit',async ev=>{
     created: old && old.created < end ? old.created : Date.now(),
   };
   if(old && JSON.stringify(old.checklist||[])!==JSON.stringify(checklist)) e.checks=[];
+  if(state.imgDraft) e.img=state.imgDraft; else delete e.img;
   const gObj=state.games[game], priv=!!(isAdmin && sharingOn && gObj && gObj.shared && $('fPrivate').checked);
   e.private=priv;
   e.shared = isAdmin && sharingOn ? !!(gObj&&gObj.shared) && !priv : false;
@@ -776,6 +783,39 @@ $('evForm').addEventListener('submit',async ev=>{
   await store.saveEvent(e);
   toast(wasEdit?'Quest updated':'Quest added');
 });
+
+/* ---------------- Quest image ---------------- */
+// Images are shrunk in the browser and saved with the quest (no extra storage needed)
+async function shrinkImage(file,max=480,quality=0.78){
+  const img=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=URL.createObjectURL(file); });
+  const k=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
+  const c=document.createElement('canvas'); c.width=Math.round(img.naturalWidth*k); c.height=Math.round(img.naturalHeight*k);
+  c.getContext('2d').drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(img.src);
+  return c.toDataURL('image/jpeg',quality);
+}
+function renderImgField(){
+  const d=state.imgDraft;
+  $('imgDrop').hidden=!!d; $('imgPrev').hidden=!d;
+  if(d) $('imgPrevImg').src=d;
+}
+async function takeImage(file){
+  if(!file || !file.type.startsWith('image/')) return toast('Please choose an image file.');
+  if(file.size>20*1024*1024) return toast('That image is too big (max 20 MB).');
+  try{ state.imgDraft=await shrinkImage(file); renderImgField(); }
+  catch(e){ toast('Could not read that image. Try a JPG or PNG.'); }
+}
+$('fImg').addEventListener('change',e=>{ const f=e.target.files[0]; e.target.value=''; takeImage(f); });
+$('imgRemove').onclick=()=>{ state.imgDraft=''; renderImgField(); };
+['dragover','dragenter'].forEach(t=>$('imgDrop').addEventListener(t,e=>{ e.preventDefault(); $('imgDrop').classList.add('over'); }));
+['dragleave','drop'].forEach(t=>$('imgDrop').addEventListener(t,()=>$('imgDrop').classList.remove('over')));
+$('imgDrop').addEventListener('drop',e=>{ e.preventDefault(); takeImage(e.dataTransfer.files[0]); });
+// Paste a screenshot while the quest form is open
+document.addEventListener('paste',e=>{
+  if(!$('eventModal').classList.contains('show')) return;
+  const item=[...(e.clipboardData?.items||[])].find(i=>i.type.startsWith('image/'));
+  if(item){ e.preventDefault(); takeImage(item.getAsFile()); toast('Image added'); }
+});
+$('imgModal').addEventListener('click',()=>closeModal('imgModal'));
 
 /* ---------------- Game editor ---------------- */
 (function fillGameSelects(){
@@ -908,6 +948,8 @@ async function updateEvent(id,fn){ const e=state.events[id]; if(!e) return; cons
 document.addEventListener('click',async ev=>{
   const close=ev.target.closest('[data-close]');
   if(close){ closeModal(close.dataset.close); return; }
+  const zoom=ev.target.closest('[data-zoom]');
+  if(zoom){ const q=state.events[zoom.dataset.zoom]; if(q&&q.img){ $('imgView').src=q.img; $('imgCap').textContent=q.name; openModal('imgModal'); } return; }
   const t=ev.target.closest('[data-toggle],[data-edit],[data-del],[data-editgame],[data-filter],[data-daily],[data-cnt],[data-action],[data-quick],[data-cat],[data-collapse],[data-follow],#clearEnded');
   if(!t) return;
   const d=t.dataset;
@@ -939,7 +981,7 @@ document.addEventListener('change',async ev=>{
     await updateEvent(t.dataset.chk,(e,o)=>{ const c=new Set(getChecks(e,o)); t.checked?c.add(i):c.delete(i); e.checks=[...c].sort((a,b)=>a-b); e.checkFor=o.end; return e; }); }
 });
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){ ['eventModal','gameModal','confirm','nameModal'].forEach(closeModal); closeMenu(); return; }
+  if(e.key==='Escape'){ ['eventModal','gameModal','confirm','nameModal','imgModal'].forEach(closeModal); closeMenu(); return; }
   const typing=/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
   if(!typing && (e.key==='n'||e.key==='N') && !document.querySelector('.modal.show') && !$('app').hidden){ e.preventDefault(); newEvent(); }
 });

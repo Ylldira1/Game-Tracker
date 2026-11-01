@@ -103,6 +103,16 @@
       <label>Quest name</label>
       <input id="fName" placeholder="e.g. Halloween Gacha Banner" maxlength="120">
 
+      <label>Image <span class="opt">(optional — helps you spot it in-game)</span></label>
+      <label class="img-drop" id="imgDrop">
+        <input type="file" id="fImg" accept="image/*" hidden>
+        <span>📷 <b>Add image</b> · or paste a screenshot (Ctrl+V)</span>
+      </label>
+      <div class="img-prev" id="imgPrev" hidden>
+        <img id="imgPrevImg" alt="">
+        <button type="button" class="icon-btn" id="imgRemove" title="Remove image" aria-label="Remove image">✕</button>
+      </div>
+
       <div id="limitedOnly">
       <label>When does it end?</label>
       <div class="seg" id="modeSeg">
@@ -256,6 +266,11 @@
       </div>
     </form>
   </div>
+</div>
+
+<!-- Image viewer -->
+<div class="modal img-modal" id="imgModal">
+  <figure><img id="imgView" alt=""><figcaption id="imgCap"></figcaption></figure>
 </div>
 
 <!-- Confirm dialog -->
