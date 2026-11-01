@@ -7,75 +7,82 @@
 <meta name="theme-color" content="#0f1117">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div>
-      <h1>Game <span>Quest</span> Tracker</h1>
-      <div class="sub">Never miss a limited-time quest again.</div>
+<div class="shell">
+  <!-- Sidebar: games + profile -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-brand">
+      <span class="logo">🎮</span>
+      <div><b>Game <span>Quest</span></b><small>Tracker</small></div>
+      <button class="icon-btn sb-close" id="sbClose" aria-label="Close menu">✕</button>
     </div>
-    <div class="head-right">
+    <div class="sb-scroll">
+      <div class="sb-head"><span>Games</span><button class="sb-add" data-action="addgame" title="Add game" aria-label="Add game">+</button></div>
+      <nav class="sb-games" id="tabs"></nav>
+    </div>
+    <div class="sb-foot">
       <div class="sync"><span class="dot" id="syncDot"></span><span id="syncText">Loading…</span></div>
-      <div id="userBox"></div>
-      <div class="menu-wrap">
-        <button class="icon-btn" id="menuBtn" title="More" aria-label="More options">⋯</button>
-        <div class="menu" id="menu" hidden>
-          <button id="exportBtn">⬇ Export backup</button>
-          <label class="menu-item">⬆ Import backup<input type="file" id="importFile" accept=".json,application/json" hidden></label>
-          <button id="nameBtn" hidden>👤 Edit profile</button>
-          <div class="menu-sep" id="signOutSep" hidden></div>
-          <button id="signOutBtn" hidden>Sign out</button>
+      <div class="sb-user">
+        <div id="userBox"></div>
+        <div class="menu-wrap">
+          <button class="icon-btn" id="menuBtn" title="More" aria-label="More options">⋯</button>
+          <div class="menu up" id="menu" hidden>
+            <button id="nameBtn" hidden>👤 Edit profile</button>
+            <button id="exportBtn">⬇ Export backup</button>
+            <label class="menu-item">⬆ Import backup<input type="file" id="importFile" accept=".json,application/json" hidden></label>
+            <div class="menu-sep" id="signOutSep" hidden></div>
+            <button id="signOutBtn" hidden>Sign out</button>
+          </div>
         </div>
       </div>
     </div>
-  </header>
+  </aside>
+  <div class="scrim" id="scrim"></div>
 
-  <!-- Sign-in screen (Firebase mode only) -->
-  <div id="signin" class="signin" hidden>
-    <div class="card">
-      <div class="big-emoji">🎮</div>
-      <h2>Sign in to sync</h2>
-      <p>Your quests are saved to your account and show up on every device you sign in on.</p>
-      <button class="btn" id="googleBtn">Sign in with Google</button>
-      <div class="err" id="signErr"></div>
-    </div>
-  </div>
-
-  <main id="app" hidden>
-    <div class="stats">
-      <button class="stat red" data-quick="24h"><b id="sToday">0</b><small><span class="lg">Ending within </span>24h</small></button>
-      <button class="stat amber" data-quick="3d"><b id="sWeek">0</b><small><span class="lg">Ending within </span>3 days</small></button>
-      <button class="stat" data-quick="open"><b id="sActive">0</b><small>Quests to do</small></button>
-      <button class="stat green" data-quick="done"><b id="sDone">0</b><small>Done</small></button>
-    </div>
-
-    <div class="toolbar-row">
-      <div class="tb-title">Your games</div>
-      <div class="top-actions">
-        <button class="btn ghost secondary-cta" data-action="addgame">+ Add game</button>
-        <button class="btn primary-cta" id="newEventBtn">+ New quest</button>
+  <div class="main">
+    <!-- Sign-in screen (Firebase mode only) -->
+    <div id="signin" class="signin" hidden>
+      <div class="card">
+        <div class="big-emoji">🎮</div>
+        <h2>Game Quest Tracker</h2>
+        <p>Never miss a limited-time quest again. Your quests sync to every device you sign in on.</p>
+        <button class="btn" id="googleBtn">Sign in with Google</button>
+        <div class="err" id="signErr"></div>
       </div>
     </div>
-    <div class="tabs-wrap" id="tabsWrap">
-      <button class="tab-arrow left" id="tabsL" aria-label="Scroll games left">‹</button>
-      <div class="tabs" id="tabs"></div>
-      <button class="tab-arrow right" id="tabsR" aria-label="Scroll games right">›</button>
-    </div>
 
-    <div id="resets"></div>
+    <main id="app" hidden>
+      <header class="topbar">
+        <button class="icon-btn hamb" id="hamb" aria-label="Open games menu">☰</button>
+        <div class="tb-text">
+          <h1 id="pageTitle">All games</h1>
+          <div class="sub" id="pageSub"></div>
+        </div>
+        <button class="btn primary-cta" id="newEventBtn">+ New quest</button>
+      </header>
 
-    <div class="list-head">
-      <div class="cats" id="cats" role="tablist"></div>
-      <div class="quick" id="quickInfo" hidden></div>
-      <span class="spacer"></span>
-      <label class="toggle" id="showDoneWrap"><input type="checkbox" id="showDone"> Show done & ended</label>
-      <button class="chip" id="clearEnded" hidden>Clear ended</button>
-    </div>
-    <div class="list" id="list"></div>
-  </main>
+      <div class="stats">
+        <button class="stat red" data-quick="24h"><b id="sToday">0</b><small>ending in 24h</small></button>
+        <button class="stat amber" data-quick="3d"><b id="sWeek">0</b><small>in 3 days</small></button>
+        <button class="stat" data-quick="open"><b id="sActive">0</b><small>to do</small></button>
+        <button class="stat green" data-quick="done"><b id="sDone">0</b><small>done</small></button>
+      </div>
+
+      <div id="resets"></div>
+
+      <div class="list-head">
+        <div class="cats" id="cats" role="tablist"></div>
+        <div class="quick" id="quickInfo" hidden></div>
+        <span class="spacer"></span>
+        <label class="switch" id="showDoneWrap"><input type="checkbox" id="showDone"><span class="knob"></span> Show done & ended</label>
+        <button class="chip" id="clearEnded" hidden>Clear ended</button>
+      </div>
+      <div class="list" id="list"></div>
+    </main>
+  </div>
 </div>
 
 <button class="fab" id="fab" aria-label="New quest" hidden>+</button>

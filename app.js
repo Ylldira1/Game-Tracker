@@ -392,31 +392,34 @@ function renderGameSelect(){
 
 function renderTabs(){
   if(state.filter!=='all' && Object.keys(state.games).length && !state.games[state.filter]) state.filter='all';
-  const gs=gamesSorted(), {c,hot}=openCounts(Date.now());
+  const now=Date.now(), gs=gamesSorted(), {c,hot}=openCounts(now);
   const total=Object.values(c).reduce((a,b)=>a+b,0);
-  $('tabs').innerHTML = (gs.length?
-    `<button class="tab all ${state.filter==='all'?'on':''}" data-filter="all">All games <span class="n">${total}</span></button>` +
-    gs.map(g=>`<button class="tab ${state.filter===g.id?'on':''}" style="--c:${esc(g.color)}" data-filter="${esc(g.id)}">
-      <span class="sw"></span>${esc(g.name)}${g.shared?`<span class="shared-ic" title="${!isAdmin?'Followed from the Super Admin':g.audience==='some'?'Shared with selected people':'Shared with everyone'}">${!isAdmin?'🔗':g.audience==='some'?'👥':'📢'}</span>`:''}<span class="n ${hot[g.id]?'hot':''}" ${hot[g.id]?'title="A limited-time quest ends within 24h"':''}>${c[g.id]||0}</span>
-      ${state.filter===g.id?`<span class="gear" data-editgame="${esc(g.id)}" title="Game settings">⚙</span>`:''}</button>`).join('') : '') +
-    `<button class="tab add" data-action="addgame">+ Add game</button>`;
-  requestAnimationFrame(()=>{ const on=$('tabs').querySelector('.tab.on'); if(on && state.filter!=='all') on.scrollIntoView({block:'nearest',inline:'center'}); updateTabArrows(); });
+  const dailyTick=g=>{
+    const dl=nextDaily(g,now); if(!dl) return '';
+    const dq=Object.values(state.events).filter(e=>e.game===g.id&&typeOf(e)==='daily');
+    if(dq.length){ const done=dq.filter(e=>isDone(e,occ(e,now))).length, all=done===dq.length;
+      return `<span class="dtk ${all?'on':''}" title="Daily quests done: ${done}/${dq.length}">${all?'✓':`${done}/${dq.length}`}</span>`; }
+    const on=g.dailyDoneFor===dl;
+    return `<span class="dtk ${on?'on':''}" data-daily="${esc(g.id)}" title="${on?'Dailies done today':'Tap when you have done today’s dailies'}">${on?'✓':''}</span>`;
+  };
+  const sharedIc=g=>g.shared?`<span class="shared-ic" title="${!isAdmin?'Followed from the Super Admin':g.audience==='some'?'Shared with selected people':'Shared with everyone'}">${!isAdmin?'🔗':g.audience==='some'?'👥':'📢'}</span>`:'';
+  $('tabs').innerHTML =
+    `<div class="sb-item all ${state.filter==='all'?'on':''}" data-filter="all" role="button" tabindex="0"><span class="ico">◎</span><span class="nm">All games</span><span class="n">${total}</span></div>` +
+    gs.map(g=>`<div class="sb-item ${state.filter===g.id?'on':''}" style="--c:${esc(g.color)}" data-filter="${esc(g.id)}" role="button" tabindex="0">
+      <span class="sw"></span><span class="nm">${esc(g.name)}</span>${sharedIc(g)}
+      <span class="gear" data-editgame="${esc(g.id)}" title="Game settings">⚙</span>
+      ${c[g.id]?`<span class="n ${hot[g.id]?'hot':''}" ${hot[g.id]?'title="A limited-time quest ends within 24h"':''}>${c[g.id]}</span>`:''}
+      ${dailyTick(g)}
+    </div>`).join('') +
+    `<button class="sb-item add" data-action="addgame"><span class="ico">＋</span><span class="nm">Add game</span></button>`;
+  const g=state.games[state.filter];
+  $('pageTitle').innerHTML = g ? `<span class="tdot" style="background:${esc(g.color)}"></span>${esc(g.name)}${sharedIc(g)}` : 'All games';
 }
 
-// Game tabs: one scrollable line with arrows + faded edges when it overflows
-function updateTabArrows(){
-  const t=$('tabs'), w=$('tabsWrap');
-  w.classList.toggle('can-l', t.scrollLeft>2);
-  w.classList.toggle('can-r', t.scrollLeft+t.clientWidth<t.scrollWidth-2);
-}
-$('tabs').addEventListener('scroll',updateTabArrows,{passive:true});
-window.addEventListener('resize',updateTabArrows);
-$('tabsL').onclick=()=>$('tabs').scrollBy({left:-260});
-$('tabsR').onclick=()=>$('tabs').scrollBy({left:260});
-$('tabs').addEventListener('wheel',e=>{
-  const t=$('tabs'); if(t.scrollWidth<=t.clientWidth || Math.abs(e.deltaX)>Math.abs(e.deltaY)) return;
-  e.preventDefault(); t.scrollLeft+=e.deltaY;
-},{passive:false});
+// Mobile: the sidebar slides in as a drawer
+const openDrawer=()=>document.body.classList.add('drawer');
+const closeDrawer=()=>document.body.classList.remove('drawer');
+$('hamb').onclick=openDrawer; $('sbClose').onclick=closeDrawer; $('scrim').onclick=closeDrawer;
 
 function renderResets(){
   const now=Date.now();
@@ -425,31 +428,16 @@ function renderResets(){
   // Games that reset at the same moments share one line
   const groups=new Map();
   gs.forEach(g=>{
-    const r={dl:nextDaily(g,now), wk:nextWeekly(g,now)};
-    const key=`${r.dl}|${r.wk}`;
+    const r={dl:nextDaily(g,now), wk:nextWeekly(g,now)}, key=`${r.dl}|${r.wk}`;
     if(!groups.has(key)) groups.set(key,{r,games:[]});
     groups.get(key).games.push(g);
   });
-  const chip=(icon,label,t,kind)=>t?`<span class="rchip">${icon} ${label} ${timeChip(t,false,kind)}</span>`:'';
   const many=groups.size>1;
-  const lines=[...groups.values()].map(({r,games})=>{
-    const who = !many ? (gs.length>1?'All games':esc(games[0].name))
-      : games.map(g=>`<span class="rwho" style="--c:${esc(g.color)}"><span class="sw"></span>${esc(g.name)}</span>`).join('');
-    return `<div class="rline"><div class="rtimes">${chip('☀️','Daily',r.dl,'daily')}${chip('📅','Weekly',r.wk,'weekly')}</div><div class="rgames">${who}</div></div>`;
-  }).join('');
-  // One small "dailies done" tick per game
-  const ticks=gs.filter(g=>nextDaily(g,now)).map(g=>{
-    const dl=nextDaily(g,now), dq=Object.values(state.events).filter(e=>e.game===g.id&&typeOf(e)==='daily');
-    if(dq.length){
-      const done=dq.filter(e=>isDone(e,occ(e,now))).length, all=done===dq.length;
-      return `<span class="dtick ${all?'on':''}" style="--c:${esc(g.color)}" title="Daily quests done for ${esc(g.name)}"><span class="sw"></span>${esc(g.name)} <b>${all?'✓':`${done}/${dq.length}`}</b></span>`;
-    }
-    const done=g.dailyDoneFor===dl;
-    return `<button class="dtick ${done?'on':''}" style="--c:${esc(g.color)}" data-daily="${esc(g.id)}" title="Tap when you've done today's dailies in ${esc(g.name)}"><span class="sw"></span>${esc(g.name)} <b>${done?'✓':'○'}</b></button>`;
-  }).join('');
-  $('resets').innerHTML = `<button class="section toggle-sec" data-collapse="resets" aria-expanded="${state.resetsOpen}">
-      <span class="caret">${state.resetsOpen?'▾':'▸'}</span> Resets</button>
-    ${state.resetsOpen?`<div class="rbox">${lines}${ticks?`<div class="dticks"><span class="dlabel">Dailies done</span>${ticks}</div>`:''}</div>`:''}`;
+  $('resets').innerHTML=[...groups.values()].map(({r,games})=>`<div class="rbar">
+      ${r.dl?`<span class="rchip">☀️ Daily<span class="rlbl"> reset</span> ${timeChip(r.dl,false,'daily')}</span>`:''}
+      ${r.wk?`<span class="rchip">📅 Weekly<span class="rlbl"> reset</span> ${timeChip(r.wk,false,'weekly')}</span>`:''}
+      ${many?`<span class="rgames">${games.map(g=>`<span class="rwho" style="--c:${esc(g.color)}"><span class="sw"></span>${esc(g.name)}</span>`).join('')}</span>`:''}
+    </div>`).join('');
 }
 
 /* Big card for limited-time quests */
@@ -625,6 +613,8 @@ function renderStats(){
   $('sActive').textContent=all.filter(x=>QUICK.open.test(x,now)).length;
   $('sDone').textContent=all.filter(x=>QUICK.done.test(x,now)).length;
   document.querySelectorAll('.stat').forEach(b=>b.classList.toggle('on',b.dataset.quick===state.quick));
+  const todo=all.filter(x=>QUICK.open.test(x,now)).length, soon=all.filter(x=>QUICK['24h'].test(x,now)).length;
+  $('pageSub').textContent = todo ? `${todo} quest${todo===1?'':'s'} to do${soon?` · ${soon} ending within 24h`:''}` : 'All caught up ✨';
 }
 
 function renderAll(){ renderGameSelect(); renderTabs(); renderResets(); renderList(); renderStats(); }
@@ -976,12 +966,12 @@ document.addEventListener('click',async ev=>{
   if(d.quick){ state.quick = state.quick===d.quick ? null : d.quick; renderList(); renderStats(); return; }
   if(d.cat){ state.cat=d.cat; prefSet('cat',state.cat); renderList(); return; }
   if(d.collapse==='resets'){ state.resetsOpen=!state.resetsOpen; prefSet('resetsOpen',state.resetsOpen); renderResets(); return; }
-  if(d.filter && !d.editgame){ state.filter=d.filter; prefSet('filter',state.filter); renderTabs(); renderResets(); renderList(); renderStats(); return; }
+  if(d.filter && !d.editgame){ closeDrawer(); state.filter=d.filter; prefSet('filter',state.filter); renderTabs(); renderResets(); renderList(); renderStats(); return; }
   if(!store) return toast('Still loading…');
   if(d.follow){ const sg=raw.sGames[d.follow]; await store.follow(d.follow); toast(`🔗 Following “${sg?sg.name:'game'}”`);
     if(sharedAvailable().length) openGame(null); else closeGame(); }
-  else if(d.editgame){ ev.stopPropagation(); openGame(d.editgame); }
-  else if(d.action==='addgame') openGame(null);
+  else if(d.editgame){ ev.stopPropagation(); closeDrawer(); openGame(d.editgame); }
+  else if(d.action==='addgame'){ closeDrawer(); openGame(null); }
   else if(d.action==='newevent') newEvent(d.type);
   else if(d.toggle) await updateEvent(d.toggle,(e,o)=>{ e.doneFor=isDone(e,o)?null:o.end; return e; });
   else if(d.cnt) await updateEvent(d.cnt,(e,o)=>{ e.count=Math.max(0,Math.min(+e.goal||0,getCount(e,o)+(+d.d))); e.countFor=o.end; return e; });
@@ -1001,7 +991,8 @@ document.addEventListener('change',async ev=>{
     await updateEvent(t.dataset.chk,(e,o)=>{ const c=new Set(getChecks(e,o)); t.checked?c.add(i):c.delete(i); e.checks=[...c].sort((a,b)=>a-b); e.checkFor=o.end; return e; }); }
 });
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){ ['eventModal','gameModal','confirm','nameModal','imgModal'].forEach(closeModal); closeMenu(); return; }
+  if(e.key==='Enter' && e.target.classList && e.target.classList.contains('sb-item')){ e.target.click(); return; }
+  if(e.key==='Escape'){ closeDrawer(); ['eventModal','gameModal','confirm','nameModal','imgModal'].forEach(closeModal); closeMenu(); return; }
   const typing=/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
   if(!typing && (e.key==='n'||e.key==='N') && !document.querySelector('.modal.show') && !$('app').hidden){ e.preventDefault(); newEvent(); }
 });
@@ -1020,7 +1011,7 @@ function avatarHtml(spec,name,cls=''){
 }
 function renderUser(){
   const nm=state.displayName||state.googleName||'';
-  $('userBox').innerHTML=`${avatarHtml(state.photoCustom||state.photo,nm)}<span>${esc(nm)}</span>${isAdmin?'<span class="admin-badge" title="You can share games with others">Super Admin</span>':''}`;
+  $('userBox').innerHTML=`${avatarHtml(state.photoCustom||state.photo,nm)}<span>${esc(nm)}</span>${isAdmin?'<span class="admin-badge" title="Super Admin: you can share games with others">Admin</span>':''}`;
 }
 function pfRender(){
   const d=state.pfDraft, nm=$('nName').value.trim()||state.googleName;
