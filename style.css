@@ -46,8 +46,11 @@ h1 span{color:var(--accent2)}
 .stat.red b{color:var(--red)} .stat.amber b{color:var(--amber)} .stat.green b{color:var(--green)}
 
 /* Game tabs */
-.topbar{display:flex;gap:12px;align-items:center;margin-bottom:16px}
-.tabs{flex:1;display:flex;gap:8px;overflow-x:auto;padding:2px;scrollbar-width:thin}
+.topbar{display:flex;gap:12px;align-items:flex-start;margin-bottom:16px}
+.tabs{flex:1;display:flex;gap:8px;flex-wrap:wrap;padding:2px;min-width:0}
+.top-actions{display:flex;gap:8px;flex:none}
+.secondary-cta{width:auto;padding:9px 14px;white-space:nowrap}
+.tabs .tab.add{display:none}
 .tab{flex:none;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:999px;padding:7px 8px 7px 13px;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:7px;white-space:nowrap}
 .tab.all{padding-right:13px}
 .tab:hover{border-color:var(--muted)}
@@ -182,7 +185,10 @@ summary{cursor:pointer;font-size:13px;color:var(--accent2)}
   .stat .lg{display:none}
   .resets{display:flex;overflow-x:auto;gap:8px;padding-bottom:4px}
   .reset{flex:0 0 210px}
-  .primary-cta{display:none}
+  .top-actions{display:none}
+  .tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -12px;padding:2px 12px}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs .tab.add{display:flex;order:-1}
   .acts{opacity:1}
   .ev{grid-template-columns:auto 1fr;padding:12px}
   .right{grid-column:2;flex-direction:row;justify-content:space-between;align-items:center;width:100%}
