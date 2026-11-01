@@ -321,3 +321,22 @@ fieldset:disabled{opacity:.6}
 .col-btn{width:26px;height:26px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0}
 .col-btn.on{border-color:#fff}
 @media (max-width:760px){ .emo-grid{grid-template-columns:repeat(6,1fr)} }
+
+/* Compact resets */
+.rbox{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;display:flex;flex-direction:column;gap:10px}
+.rline{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.rline + .rline{border-top:1px solid var(--line);padding-top:10px}
+.rtimes{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.rchip{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.rgames{display:flex;gap:10px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.rwho{display:inline-flex;align-items:center;gap:5px}
+.rwho .sw,.dtick .sw{width:8px;height:8px;border-radius:50%;background:var(--c)}
+.dticks{display:flex;gap:6px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--line);padding-top:10px}
+.dlabel{font-size:12px;color:var(--muted);margin-right:4px}
+.dtick{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-family:inherit}
+button.dtick{cursor:pointer}
+button.dtick:hover{border-color:var(--c)}
+.dtick b{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted)}
+.dtick.on{border-color:rgba(62,207,142,.5);background:rgba(62,207,142,.1)}
+.dtick.on b{color:var(--green)}
+@media (max-width:760px){ .rtimes{gap:8px} .rchip{font-size:12px} }

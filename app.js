@@ -402,26 +402,34 @@ function renderResets(){
   const now=Date.now();
   const gs=gamesSorted().filter(g=>(state.filter==='all'||g.id===state.filter)&&(nextDaily(g,now)||nextWeekly(g,now)));
   if(!gs.length){ $('resets').innerHTML=''; return; }
-  const cards = gs.map(g=>{
-    const dl=nextDaily(g,now), wk=nextWeekly(g,now);
-    const hasMo=Object.values(state.events).some(e=>e.game===g.id&&e.type==='monthly');
-    const mo=hasMo?nextMonthly(resetCfg(g),now):null;
-    const dq=Object.values(state.events).filter(e=>e.game===g.id&&typeOf(e)==='daily');
-    let badge='';
+  // Games that reset at the same moments share one line
+  const groups=new Map();
+  gs.forEach(g=>{
+    const r={dl:nextDaily(g,now), wk:nextWeekly(g,now)};
+    const key=`${r.dl}|${r.wk}`;
+    if(!groups.has(key)) groups.set(key,{r,games:[]});
+    groups.get(key).games.push(g);
+  });
+  const chip=(icon,label,t,kind)=>t?`<span class="rchip">${icon} ${label} ${timeChip(t,false,kind)}</span>`:'';
+  const many=groups.size>1;
+  const lines=[...groups.values()].map(({r,games})=>{
+    const who = !many ? (gs.length>1?'All games':esc(games[0].name))
+      : games.map(g=>`<span class="rwho" style="--c:${esc(g.color)}"><span class="sw"></span>${esc(g.name)}</span>`).join('');
+    return `<div class="rline"><div class="rtimes">${chip('☀️','Daily',r.dl,'daily')}${chip('📅','Weekly',r.wk,'weekly')}</div><div class="rgames">${who}</div></div>`;
+  }).join('');
+  // One small "dailies done" tick per game
+  const ticks=gs.filter(g=>nextDaily(g,now)).map(g=>{
+    const dl=nextDaily(g,now), dq=Object.values(state.events).filter(e=>e.game===g.id&&typeOf(e)==='daily');
     if(dq.length){
       const done=dq.filter(e=>isDone(e,occ(e,now))).length, all=done===dq.length;
-      badge=`<span class="daily ${all?'on':''}" title="Daily quests done">${all?'✓ ':''}${done}/${dq.length}</span>`;
-    }else if(dl){
-      const done=g.dailyDoneFor===dl;
-      badge=`<button class="daily ${done?'on':''}" data-daily="${esc(g.id)}" title="Tick when you've done today's dailies">${done?'Dailies ✓':'Dailies'}</button>`;
+      return `<span class="dtick ${all?'on':''}" style="--c:${esc(g.color)}" title="Daily quests done for ${esc(g.name)}"><span class="sw"></span>${esc(g.name)} <b>${all?'✓':`${done}/${dq.length}`}</b></span>`;
     }
-    return `<div class="reset" style="--c:${esc(g.color)}">
-      <div class="rn"><span class="sw"></span><span class="rname">${esc(g.name)}</span>${badge}</div>
-      ${[['Daily',dl],['Weekly',wk],['Monthly',mo]].filter(r=>r[1]).map(([l,t])=>`<div class="rl"><span>${l}</span><b data-t="${t}" data-fmt="${t-now<D?'':'s'}">${t-now<D?fmtLeft(t-now):fmtShort(t-now)}</b></div>`).join('')}
-    </div>`;}).join('');
+    const done=g.dailyDoneFor===dl;
+    return `<button class="dtick ${done?'on':''}" style="--c:${esc(g.color)}" data-daily="${esc(g.id)}" title="Tap when you've done today's dailies in ${esc(g.name)}"><span class="sw"></span>${esc(g.name)} <b>${done?'✓':'○'}</b></button>`;
+  }).join('');
   $('resets').innerHTML = `<button class="section toggle-sec" data-collapse="resets" aria-expanded="${state.resetsOpen}">
       <span class="caret">${state.resetsOpen?'▾':'▸'}</span> Resets</button>
-    ${state.resetsOpen?`<div class="resets">${cards}</div>`:''}`;
+    ${state.resetsOpen?`<div class="rbox">${lines}${ticks?`<div class="dticks"><span class="dlabel">Dailies done</span>${ticks}</div>`:''}</div>`:''}`;
 }
 
 /* Big card for limited-time quests */
