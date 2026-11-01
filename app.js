@@ -49,7 +49,8 @@ function localStore(){
 const ADMIN_EMAIL='darrebpphwork99@gmail.com';
 const PROG_E=['doneFor','count','countFor','checks','checkFor'];  // per-person quest progress
 const PROG_G=['dailyDoneFor'];                                   // per-person game progress
-const raw={games:{},events:{},progress:{},follow:{games:[],hidden:[]},sGames:{},sQuests:{},profiles:{}};
+let myEmail='';
+const raw={games:{},events:{},progress:{},follow:{games:[],hidden:[],left:[]},sGames:{},sQuests:{},profiles:{}};
 const parts={};   // shared data arrives from several queries; merged into raw.sGames / raw.sQuests
 const audienceOf=g=>({audience:(g&&g.audience)||'all', emails:(g&&g.emails)||[]});
 let isAdmin=false, sharingOn=false;
@@ -61,7 +62,7 @@ function compose(){
   const f=raw.follow, games={}, events={};
   Object.values(raw.games).forEach(g=>{ games[g.id]=g; });
   Object.values(raw.sGames).forEach(g=>{
-    if(isAdmin || f.games.includes(g.id)) games[g.id]={...g, ...pick(raw.progress[g.id],PROG_G), id:g.id, shared:true};
+    if(isAdmin || isFollowing(g)) games[g.id]={...g, ...pick(raw.progress[g.id],PROG_G), id:g.id, shared:true};
   });
   Object.values(raw.events).forEach(e=>{
     events[e.id]=e;
@@ -75,7 +76,12 @@ function compose(){
   });
   state.games=games; state.events=events;
 }
-const sharedAvailable=()=>Object.values(raw.sGames).filter(g=>!raw.follow.games.includes(g.id)).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+function isFollowing(g){
+  const f=raw.follow;
+  if(f.games.includes(g.id)) return true;
+  return g.audience==='some' && (g.emails||[]).includes(myEmail) && !f.left.includes(g.id);
+}
+const sharedAvailable=()=>Object.values(raw.sGames).filter(g=>!isFollowing(g)).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
 const hiddenCount=gid=>raw.follow.hidden.filter(id=>raw.sQuests[id]&&raw.sQuests[id].game===gid).length;
 
 /* ---------------- Storage: Firebase ---------------- */
@@ -146,8 +152,8 @@ async function firebaseStore(){
       }
       return del(U('events',id)).catch(fail);
     },
-    follow(gid){ if(!raw.follow.games.includes(gid)) raw.follow.games.push(gid); compose(); renderAll(); return saveFollow(); },
-    unfollow(gid){ raw.follow.games=raw.follow.games.filter(x=>x!==gid); compose(); renderAll(); return saveFollow(); },
+    follow(gid){ if(!raw.follow.games.includes(gid)) raw.follow.games.push(gid); raw.follow.left=raw.follow.left.filter(x=>x!==gid); compose(); renderAll(); return saveFollow(); },
+    unfollow(gid){ raw.follow.games=raw.follow.games.filter(x=>x!==gid); if(!raw.follow.left.includes(gid)) raw.follow.left.push(gid); compose(); renderAll(); return saveFollow(); },
     unhide(gid){ raw.follow.hidden=raw.follow.hidden.filter(id=>!(raw.sQuests[id]&&raw.sQuests[id].game===gid)); compose(); renderAll(); return saveFollow(); },
     // Admin only: move a game (and its quests) between private and shared
     async shareGame(g,on){
@@ -176,7 +182,7 @@ async function firebaseStore(){
   onAuthStateChanged(auth,u=>{
     unsubs.forEach(f=>f()); unsubs=[];
     user=u;
-    Object.assign(raw,{games:{},events:{},progress:{},follow:{games:[],hidden:[]},sGames:{},sQuests:{},profiles:{}});
+    Object.assign(raw,{games:{},events:{},progress:{},follow:{games:[],hidden:[],left:[]},sGames:{},sQuests:{},profiles:{}});
     Object.keys(parts).forEach(k=>delete parts[k]);
     if(!u){
       state.games={}; state.events={};
@@ -207,7 +213,7 @@ async function firebaseStore(){
       compose(); status(); renderAll();
     },onErr);
     // Shared data: the Super Admin reads everything; others read what's shared with everyone or with their email
-    const email=(u.email||'').toLowerCase();
+    const email=(u.email||'').toLowerCase(); myEmail=email;
     const sharedSubs=col=>{
       const key=col==='sharedGames'?'sGames':'sQuests';
       if(isAdmin) return [sub(fs.collection(db,col),key)];
@@ -238,7 +244,7 @@ async function firebaseStore(){
       ...(isAdmin?[sub(fs.collection(db,'profiles'),'profiles')]:[]),
       fs.onSnapshot(U('meta','follow'),snap=>{
         const d=snap.exists()?snap.data():{};
-        raw.follow={games:d.games||[],hidden:d.hidden||[]};
+        raw.follow={games:d.games||[],hidden:d.hidden||[],left:d.left||[]};
         compose(); renderAll();
       },onErr),
     );
