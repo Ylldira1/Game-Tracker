@@ -367,7 +367,11 @@ const QUICK = {
 const prefGet=(k,d)=>{ try{ const v=localStorage.getItem('get.'+k); return v===null?d:JSON.parse(v); }catch(e){ return d; } };
 const prefSet=(k,v)=>{ try{ localStorage.setItem('get.'+k,JSON.stringify(v)); }catch(e){} };
 state.resetsOpen = prefGet('resetsOpen', true);
-state.cat = 'all';
+// Remember view choices in this browser
+state.cat = prefGet('cat','all');
+state.showDone = prefGet('showDone',false);
+state.filter = prefGet('filter','all');
+$('showDone').checked = state.showDone;
 
 function scoped(now){
   return Object.values(state.events).filter(e=>state.filter==='all'||e.game===state.filter).map(e=>({e,o:occ(e,now)}));
@@ -387,7 +391,7 @@ function renderGameSelect(){
 }
 
 function renderTabs(){
-  if(state.filter!=='all' && !state.games[state.filter]) state.filter='all';
+  if(state.filter!=='all' && Object.keys(state.games).length && !state.games[state.filter]) state.filter='all';
   const gs=gamesSorted(), {c,hot}=openCounts(Date.now());
   const total=Object.values(c).reduce((a,b)=>a+b,0);
   $('tabs').innerHTML = (gs.length?
@@ -954,9 +958,9 @@ document.addEventListener('click',async ev=>{
   if(!t) return;
   const d=t.dataset;
   if(d.quick){ state.quick = state.quick===d.quick ? null : d.quick; renderList(); renderStats(); return; }
-  if(d.cat){ state.cat=d.cat; renderList(); return; }
+  if(d.cat){ state.cat=d.cat; prefSet('cat',state.cat); renderList(); return; }
   if(d.collapse==='resets'){ state.resetsOpen=!state.resetsOpen; prefSet('resetsOpen',state.resetsOpen); renderResets(); return; }
-  if(d.filter && !d.editgame){ state.filter=d.filter; renderTabs(); renderResets(); renderList(); renderStats(); return; }
+  if(d.filter && !d.editgame){ state.filter=d.filter; prefSet('filter',state.filter); renderTabs(); renderResets(); renderList(); renderStats(); return; }
   if(!store) return toast('Still loading…');
   if(d.follow){ const sg=raw.sGames[d.follow]; await store.follow(d.follow); toast(`🔗 Following “${sg?sg.name:'game'}”`);
     if(sharedAvailable().length) openGame(null); else closeGame(); }
@@ -976,7 +980,7 @@ document.addEventListener('click',async ev=>{
 });
 document.addEventListener('change',async ev=>{
   const t=ev.target;
-  if(t.id==='showDone'){ state.showDone=t.checked; renderList(); }
+  if(t.id==='showDone'){ state.showDone=t.checked; prefSet('showDone',state.showDone); renderList(); }
   else if(t.dataset.chk){ const i=+t.dataset.i;
     await updateEvent(t.dataset.chk,(e,o)=>{ const c=new Set(getChecks(e,o)); t.checked?c.add(i):c.delete(i); e.checks=[...c].sort((a,b)=>a-b); e.checkFor=o.end; return e; }); }
 });
