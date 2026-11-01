@@ -170,6 +170,18 @@ function fmtLeft(ms){
   return d>0 ? `${d}d ${p(h)}h ${p(m)}m` : `${p(h)}:${p(m)}:${p(sec)}`;
 }
 function urgency(ms){ if(ms<=0)return'gray'; if(ms<D)return'red'; if(ms<3*D)return'amber'; return'green'; }
+// Countdowns from the game hide seconds, so "time left" is slightly early.
+// Round to the most likely real end: the game's reset time (e.g. 4:00 / 3:59 AM),
+// otherwise the nearest :00 or :59 when it's within a few minutes.
+function snapEnd(t,g){
+  const c=resetCfg(g), o=c.offset*H, s=new Date(t+o);
+  const dayStart=Date.UTC(s.getUTCFullYear(),s.getUTCMonth(),s.getUTCDate())-o;
+  let best=null;
+  const consider=(x,tol,why)=>{ const d=Math.abs(x-t); if(d<=tol && (!best||d<best.d)) best={t:x,d,why}; };
+  for(let k=-1;k<=1;k++){ const r=dayStart+k*D+c.dailyHour*H; consider(r,15*60000,'reset'); consider(r-60000,15*60000,'reset'); }
+  if(!best){ const hs=t-(t%H); [hs,hs+H].forEach(x=>{ consider(x,3*60000,'hour'); consider(x-60000,3*60000,'hour'); }); }
+  return best ? {t:best.t, snapped:best.t!==t, why:best.why} : {t, snapped:false};
+}
 function fmtShort(ms){
   if(ms<=0) return 'now';
   const s=Math.floor(ms/1000), d=Math.floor(s/86400), h=Math.floor(s%86400/3600), m=Math.floor(s%3600/60);
@@ -462,7 +474,7 @@ function setRepeatField(r){
 function resetForm(){
   state.editId=null;
   ['fName','fNote','fD','fH','fM','fEnd','fGoal','fChecklist','fRepeatDays'].forEach(id=>$(id).value='');
-  $('fServer').checked=false; setRepeatField(0); setPrio('normal'); setMode('left'); setType('limited');
+  $('fServer').checked=false; setRepeatField(0); setPrio('normal'); setMode('left'); setType('limited'); updateLeftPreview();
   $('fErr').textContent=''; $('formTitle').textContent='New quest'; $('fSubmit').textContent='Add quest';
   $('moreOpts').open=false;
 }
@@ -492,7 +504,14 @@ function startEdit(id){
 $('modeSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) setMode(b.dataset.m); });
 $('prioSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) setPrio(b.dataset.p); });
 $('typeSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) setType(b.dataset.type); });
-$('fGame').addEventListener('change',updateTypeInfo);
+$('fGame').addEventListener('change',()=>{ updateTypeInfo(); updateLeftPreview(); });
+function updateLeftPreview(){
+  const ms=(((+$('fD').value||0)*24+(+$('fH').value||0))*60+(+$('fM').value||0))*60000, el=$('leftPreview');
+  if(ms<=0){ el.innerHTML='Copy the countdown the game shows you.'; return; }
+  const r=snapEnd(Date.now()+ms, state.games[$('fGame').value]);
+  el.innerHTML=`Ends <b>${esc(fmtDate(r.t))}</b>`+(r.snapped?` <span class="snap">✓ adjusted to the ${r.why==='reset'?'game\'s reset time':'exact hour'}</span>`:'');
+}
+['fD','fH','fM'].forEach(id=>$(id).addEventListener('input',updateLeftPreview));
 $('fRepeat').addEventListener('change',()=>{ $('customRepeat').hidden=$('fRepeat').value!=='custom'; });
 $('newEventBtn').onclick=()=>newEvent();
 $('fab').onclick=()=>newEvent();
@@ -509,7 +528,7 @@ $('evForm').addEventListener('submit',async ev=>{
     if(state.mode==='left'){
       const ms=(((+$('fD').value||0)*24+(+$('fH').value||0))*60+(+$('fM').value||0))*60000;
       if(ms<=0) return err('Enter how much time is left.');
-      end=Date.now()+ms;
+      end=snapEnd(Date.now()+ms, state.games[game]).t;
     }else{
       const v=$('fEnd').value; if(!v) return err('Pick the end date and time.');
       if($('fServer').checked){

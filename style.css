@@ -255,3 +255,6 @@ summary{cursor:pointer;font-size:13px;color:var(--accent2)}
   .modal .card{max-width:none;border-radius:18px 18px 0 0;max-height:94vh}
 }
 @media (min-width:761px){ .fab{display:none} }
+
+.left-preview b{color:var(--text)}
+.snap{color:var(--green)}
