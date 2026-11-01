@@ -25,7 +25,7 @@
         <div class="menu" id="menu" hidden>
           <button id="exportBtn">⬇ Export backup</button>
           <label class="menu-item">⬆ Import backup<input type="file" id="importFile" accept=".json,application/json" hidden></label>
-          <button id="nameBtn" hidden>✏️ Change display name</button>
+          <button id="nameBtn" hidden>👤 Edit profile</button>
           <div class="menu-sep" id="signOutSep" hidden></div>
           <button id="signOutBtn" hidden>Sign out</button>
         </div>
@@ -228,15 +228,25 @@
   </div>
 </div>
 
-<!-- Display name -->
+<!-- Profile -->
 <div class="modal" id="nameModal">
   <div class="card">
     <div class="modal-head">
-      <h2>Display name</h2>
+      <h2>Your profile</h2>
       <button class="icon-btn" type="button" data-close="nameModal" aria-label="Close">✕</button>
     </div>
     <form id="nameForm" autocomplete="off">
-      <label>Name shown in the tracker</label>
+      <div class="pf-top">
+        <div id="pfPreview"></div>
+        <div class="pf-actions">
+          <label class="chip pf-up">📷 Upload picture<input type="file" id="pfFile" accept="image/*" hidden></label>
+          <button type="button" class="chip" id="pfGoogle">Use Google photo</button>
+        </div>
+      </div>
+      <label>Or pick an avatar</label>
+      <div class="emo-grid" id="pfEmojis"></div>
+      <div class="col-row" id="pfColors"></div>
+      <label>Display name</label>
       <input id="nName" maxlength="30" placeholder="e.g. Daryll">
       <div class="hint" id="nHint"></div>
       <div class="err" id="nErr"></div>

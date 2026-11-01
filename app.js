@@ -193,7 +193,7 @@ async function firebaseStore(){
     }
     isAdmin=(u.email||'').toLowerCase()===ADMIN_EMAIL; sharingOn=true;
     $('signin').hidden=true; $('app').hidden=false; $('fab').hidden=false;
-    state.googleName=u.displayName||u.email||''; state.displayName=''; state.photo=u.photoURL||'';
+    state.googleName=u.displayName||u.email||''; state.displayName=''; state.photo=u.photoURL||''; state.photoCustom='';
     renderUser();
     $('signOutBtn').hidden=false; $('signOutSep').hidden=false; $('nameBtn').hidden=false;
     $('signOutBtn').onclick=()=>{ closeMenu(); signOut(auth); };
@@ -234,9 +234,9 @@ async function firebaseStore(){
       });
     }
     // Let the Super Admin see who has signed in (for picking people to share with)
-    const writeProfile=()=>set(fs.doc(db,'profiles',u.uid),{email,name:state.displayName||u.displayName||'',photo:u.photoURL||'',lastSeen:Date.now()}).catch(()=>{});
+    const writeProfile=()=>set(fs.doc(db,'profiles',u.uid),{email,name:state.displayName||u.displayName||'',photo:state.photoCustom||u.photoURL||'',lastSeen:Date.now()}).catch(()=>{});
     let profileWritten=false;
-    api.saveName=async name=>{ state.displayName=name; renderUser(); await set(U('meta','profile'),{name}).catch(fail); writeProfile(); };
+    api.saveProfile=async({name,photo})=>{ state.displayName=name; state.photoCustom=photo; renderUser(); await set(U('meta','profile'),{name,photo}).catch(fail); writeProfile(); };
     unsubs.push(
       sub(fs.collection(db,'users',u.uid,'games'),'games'),
       sub(fs.collection(db,'users',u.uid,'events'),'events'),
@@ -245,7 +245,8 @@ async function firebaseStore(){
       ...sharedSubs('sharedQuests'),
       ...(isAdmin?[sub(fs.collection(db,'profiles'),'profiles')]:[]),
       fs.onSnapshot(U('meta','profile'),snap=>{
-        state.displayName=(snap.exists()&&snap.data().name)||''; renderUser();
+        const d=snap.exists()?snap.data():{};
+        state.displayName=d.name||''; state.photoCustom=d.photo||''; renderUser();
         if(!profileWritten){ profileWritten=true; writeProfile(); }
       },onErr),
       fs.onSnapshot(U('meta','follow'),snap=>{
@@ -804,7 +805,7 @@ function openGame(id){
     const people=Object.values(raw.profiles).filter(p=>p.email&&p.email!==ADMIN_EMAIL).sort((a,b)=>(a.name||a.email).localeCompare(b.name||b.email));
     const known=new Set(people.map(p=>p.email));
     $('peopleList').innerHTML=people.length?people.map(p=>`<label class="person"><input type="checkbox" value="${esc(p.email)}" ${emails.includes(p.email)?'checked':''}>
-      ${p.photo?`<img src="${esc(p.photo)}" alt="" referrerpolicy="no-referrer">`:`<span class="avatar sm">${esc((p.name||p.email).charAt(0).toUpperCase())}</span>`}
+      ${avatarHtml(p.photo,p.name||p.email,'sm')}
       <span><b>${esc(p.name||p.email)}</b><small>${esc(p.email)}</small></span></label>`).join('')
       :'<div class="hint" style="margin:0">No one else has signed in yet.</div>';
     $('gEmails').value=emails.filter(e=>!known.has(e)).join('\n');
@@ -935,24 +936,64 @@ document.addEventListener('keydown',e=>{
   if(!typing && (e.key==='n'||e.key==='N') && !document.querySelector('.modal.show') && !$('app').hidden){ e.preventDefault(); newEvent(); }
 });
 
-/* ---------------- Display name ---------------- */
+/* ---------------- Profile (name + picture) ---------------- */
+// Picture values: '' (Google photo), 'data:image/…' (uploaded), or 'emoji:🐉:#7c5cff' (avatar)
+const AV_EMOJIS=['🐉','🦊','🐱','🐺','🦄','🐼','🐧','🦉','👾','🎮','⚔️','🛡️','🌙','⭐','🔥','🌸','💎','👑'];
+function avatarHtml(spec,name,cls=''){
+  if(spec && spec.startsWith('emoji:')){
+    const [,emo,color]=spec.split(':');
+    return `<span class="avatar emo ${cls}" style="background:${esc(/^#[0-9a-f]{6}$/i.test(color)?color:'#7c5cff')}">${esc(emo)}</span>`;
+  }
+  if(spec && (spec.startsWith('data:image/')||spec.startsWith('https://')))
+    return `<img class="avatar-img ${cls}" src="${esc(spec)}" alt="" referrerpolicy="no-referrer">`;
+  return `<span class="avatar ${cls}">${esc((name||'?').charAt(0).toUpperCase())}</span>`;
+}
 function renderUser(){
   const nm=state.displayName||state.googleName||'';
-  $('userBox').innerHTML=`${state.photo?`<img src="${esc(state.photo)}" alt="" referrerpolicy="no-referrer">`:`<span class="avatar">${esc(nm.charAt(0).toUpperCase())}</span>`}<span>${esc(nm)}</span>${isAdmin?'<span class="admin-badge" title="You can share games with others">Super Admin</span>':''}`;
+  $('userBox').innerHTML=`${avatarHtml(state.photoCustom||state.photo,nm)}<span>${esc(nm)}</span>${isAdmin?'<span class="admin-badge" title="You can share games with others">Super Admin</span>':''}`;
+}
+function pfRender(){
+  const d=state.pfDraft, nm=$('nName').value.trim()||state.googleName;
+  $('pfPreview').innerHTML=avatarHtml(d||state.photo,nm,'lg');
+  const [,emo,color]=d.startsWith('emoji:')?d.split(':'):[null,null,state.pfColor];
+  $('pfEmojis').innerHTML=AV_EMOJIS.map(e=>`<button type="button" class="emo-btn ${e===emo?'on':''}" data-emo="${e}">${e}</button>`).join('');
+  $('pfColors').innerHTML=PALETTE.map(c=>`<button type="button" class="col-btn ${c===(color||state.pfColor)?'on':''}" data-col="${c}" style="background:${c}" aria-label="Color ${c}"></button>`).join('');
+  $('pfGoogle').hidden=!state.photo; $('pfGoogle').classList.toggle('on',!d);
 }
 $('nameBtn').onclick=()=>{
   closeMenu();
+  state.pfDraft=state.photoCustom||'';
+  state.pfColor=state.pfDraft.startsWith('emoji:')?state.pfDraft.split(':')[2]:PALETTE[0];
   $('nName').value=state.displayName||state.googleName||''; $('nErr').textContent='';
   $('nHint').textContent=`Your Google name is “${state.googleName||'—'}”. Leave empty to use it.`;
-  openModal('nameModal'); setTimeout(()=>{ $('nName').focus(); $('nName').select(); },50);
+  pfRender(); openModal('nameModal');
 };
+$('nName').addEventListener('input',pfRender);
+$('pfEmojis').addEventListener('click',e=>{ const b=e.target.closest('[data-emo]'); if(!b) return; state.pfDraft=`emoji:${b.dataset.emo}:${state.pfColor}`; pfRender(); });
+$('pfColors').addEventListener('click',e=>{ const b=e.target.closest('[data-col]'); if(!b) return; state.pfColor=b.dataset.col;
+  if(state.pfDraft.startsWith('emoji:')) state.pfDraft=`emoji:${state.pfDraft.split(':')[1]}:${state.pfColor}`; pfRender(); });
+$('pfGoogle').onclick=()=>{ state.pfDraft=''; pfRender(); };
+$('pfFile').addEventListener('change',async ev=>{
+  const file=ev.target.files[0]; ev.target.value=''; if(!file) return;
+  if(!file.type.startsWith('image/')) return $('nErr').textContent='Please choose an image file.';
+  if(file.size>15*1024*1024) return $('nErr').textContent='That image is too big (max 15 MB).';
+  try{
+    // Shrink to a small square so it loads fast and fits in the database
+    const img=await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=URL.createObjectURL(file); });
+    const S=160, c=document.createElement('canvas'); c.width=c.height=S;
+    const side=Math.min(img.naturalWidth,img.naturalHeight);
+    c.getContext('2d').drawImage(img,(img.naturalWidth-side)/2,(img.naturalHeight-side)/2,side,side,0,0,S,S);
+    URL.revokeObjectURL(img.src);
+    state.pfDraft=c.toDataURL('image/jpeg',0.85); $('nErr').textContent=''; pfRender();
+  }catch(e){ $('nErr').textContent='Could not read that image. Try a JPG or PNG.'; }
+});
 $('nameForm').addEventListener('submit',async ev=>{
   ev.preventDefault();
   let name=$('nName').value.replace(/\s+/g,' ').trim();
   if(name===state.googleName) name='';
   if(name.length>30) return $('nErr').textContent='Keep it under 30 characters.';
   closeModal('nameModal');
-  if(store.saveName){ await store.saveName(name); toast('Display name updated'); }
+  if(store.saveProfile){ await store.saveProfile({name,photo:state.pfDraft}); toast('Profile updated'); }
 });
 
 /* ---------------- Backup ---------------- */

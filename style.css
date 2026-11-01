@@ -301,4 +301,23 @@ fieldset:disabled{opacity:.6}
 .person small{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis}
 .person:has(input:checked){border-color:var(--accent)}
 .avatar.sm{width:28px;height:28px;font-size:12px;flex:none}
-#nameModal .card{max-width:400px}
+#nameModal .card{max-width:420px}
+
+/* Profile pictures */
+.avatar-img{width:28px;height:28px;border-radius:50%;object-fit:cover;flex:none}
+.avatar.emo{font-size:15px;line-height:1}
+.avatar.emo.sm,.avatar-img.sm{width:28px;height:28px}
+.avatar.lg,.avatar-img.lg{width:72px;height:72px;font-size:30px}
+.avatar.emo.lg{font-size:38px}
+.pf-top{display:flex;align-items:center;gap:16px;margin:8px 0 4px}
+.pf-actions{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.pf-up{margin:0;cursor:pointer}
+.chip.on{border-color:var(--accent);background:rgba(124,92,255,.15)}
+.emo-grid{display:grid;grid-template-columns:repeat(9,1fr);gap:6px}
+.emo-btn{aspect-ratio:1;border-radius:10px;border:1px solid var(--line);background:var(--panel2);font-size:20px;cursor:pointer;padding:0}
+.emo-btn:hover{border-color:var(--muted)}
+.emo-btn.on{border-color:var(--accent);box-shadow:0 0 0 2px rgba(124,92,255,.35)}
+.col-row{display:flex;gap:8px;margin-top:10px}
+.col-btn{width:26px;height:26px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0}
+.col-btn.on{border-color:#fff}
+@media (max-width:760px){ .emo-grid{grid-template-columns:repeat(6,1fr)} }
