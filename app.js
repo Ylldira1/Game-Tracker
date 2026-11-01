@@ -43,6 +43,39 @@ function localStore(){
   };
 }
 
+/* ---------------- Sharing (Super Admin → followers) ---------------- */
+// The Super Admin can share games. Everyone else can follow them: shared quests then
+// appear in their tracker automatically, while done/progress stays private per person.
+const ADMIN_EMAIL='darrebpphwork99@gmail.com';
+const PROG_E=['doneFor','count','countFor','checks','checkFor'];  // per-person quest progress
+const PROG_G=['dailyDoneFor'];                                   // per-person game progress
+const raw={games:{},events:{},progress:{},follow:{games:[],hidden:[]},sGames:{},sQuests:{}};
+let isAdmin=false, sharingOn=false;
+const pick=(o,keys)=>{ const r={}; keys.forEach(k=>{ if(o&&o[k]!==undefined) r[k]=o[k]; }); return r; };
+const omit=(o,keys)=>{ const r={...o}; keys.forEach(k=>delete r[k]); return r; };
+const canEdit=x=>!x||!x.shared||isAdmin;
+
+function compose(){
+  const f=raw.follow, games={}, events={};
+  Object.values(raw.games).forEach(g=>{ games[g.id]=g; });
+  Object.values(raw.sGames).forEach(g=>{
+    if(isAdmin || f.games.includes(g.id)) games[g.id]={...g, ...pick(raw.progress[g.id],PROG_G), id:g.id, shared:true};
+  });
+  Object.values(raw.events).forEach(e=>{
+    events[e.id]=e;
+    // A followed game that was removed or unshared: keep the person's own quests visible
+    if(!games[e.game]) games[e.game]={id:e.game,name:'Removed game',color:'#8b91a7',created:0,offset:8,dailyHour:4,weeklyDay:1,monthlyDay:1};
+  });
+  Object.values(raw.sQuests).forEach(q=>{
+    const g=games[q.game]; if(!g||!g.shared) return;
+    if(!isAdmin && f.hidden.includes(q.id)) return;
+    events[q.id]={...q, ...pick(raw.progress[q.id],PROG_E), id:q.id, shared:true};
+  });
+  state.games=games; state.events=events;
+}
+const sharedAvailable=()=>Object.values(raw.sGames).filter(g=>!raw.follow.games.includes(g.id)).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+const hiddenCount=gid=>raw.follow.hidden.filter(id=>raw.sQuests[id]&&raw.sQuests[id].game===gid).length;
+
 /* ---------------- Storage: Firebase ---------------- */
 async function firebaseStore(){
   const base=`https://www.gstatic.com/firebasejs/${FB_VERSION}`;
@@ -66,17 +99,77 @@ async function firebaseStore(){
     }
   };
 
-  const api={
-    saveGame:g=>fs.setDoc(fs.doc(db,'users',user.uid,'games',g.id),clean(g)).catch(fail),
-    deleteGame:id=>fs.deleteDoc(fs.doc(db,'users',user.uid,'games',id)).catch(fail),
-    saveEvent:e=>fs.setDoc(fs.doc(db,'users',user.uid,'events',e.id),clean(e)).catch(fail),
-    deleteEvent:id=>fs.deleteDoc(fs.doc(db,'users',user.uid,'events',id)).catch(fail),
-  };
   function fail(e){ console.error(e); toast('Could not save: '+(e.code||'error')); }
+  const U=(...p)=>fs.doc(db,'users',user.uid,...p);
+  const S=(col,id)=>fs.doc(db,col,id);
+  const set=(ref,data)=>fs.setDoc(ref,clean(data));
+  const del=ref=>fs.deleteDoc(ref);
+  const saveFollow=()=>set(U('meta','follow'),raw.follow).catch(fail);
+
+  const api={
+    sharing:true,
+    saveGame(g){
+      if(g.shared){
+        const w=[set(U('progress',g.id),{dailyDoneFor:g.dailyDoneFor??null})];
+        if(isAdmin) w.push(set(S('sharedGames',g.id),omit(g,[...PROG_G,'shared'])));
+        return Promise.all(w).catch(fail);
+      }
+      return set(U('games',g.id),omit(g,['shared'])).catch(fail);
+    },
+    deleteGame(id,shared){
+      if(shared){
+        if(isAdmin) return del(S('sharedGames',id)).catch(fail);
+        return api.unfollow(id);
+      }
+      return del(U('games',id)).catch(fail);
+    },
+    saveEvent(e){
+      if(e.shared){
+        const w=[set(U('progress',e.id),pick(e,PROG_E))];
+        if(isAdmin) w.push(set(S('sharedQuests',e.id),omit(e,[...PROG_E,'shared'])));
+        return Promise.all(w).catch(fail);
+      }
+      return set(U('events',e.id),omit(e,['shared'])).catch(fail);
+    },
+    deleteEvent(id,shared){
+      if(shared){
+        if(isAdmin) return Promise.all([del(S('sharedQuests',id)),del(U('progress',id))]).catch(fail);
+        if(!raw.follow.hidden.includes(id)) raw.follow.hidden.push(id);
+        compose(); return saveFollow();
+      }
+      return del(U('events',id)).catch(fail);
+    },
+    follow(gid){ if(!raw.follow.games.includes(gid)) raw.follow.games.push(gid); compose(); renderAll(); return saveFollow(); },
+    unfollow(gid){ raw.follow.games=raw.follow.games.filter(x=>x!==gid); compose(); renderAll(); return saveFollow(); },
+    unhide(gid){ raw.follow.hidden=raw.follow.hidden.filter(id=>!(raw.sQuests[id]&&raw.sQuests[id].game===gid)); compose(); renderAll(); return saveFollow(); },
+    // Admin only: move a game (and its quests) between private and shared
+    async shareGame(g,on){
+      try{
+        if(on){
+          await set(S('sharedGames',g.id),omit(g,[...PROG_G,'shared']));
+          await set(U('progress',g.id),{dailyDoneFor:g.dailyDoneFor??null});
+          for(const e of Object.values(raw.events).filter(e=>e.game===g.id)){
+            await set(S('sharedQuests',e.id),omit(e,[...PROG_E,'shared']));
+            await set(U('progress',e.id),pick(e,PROG_E));
+            await del(U('events',e.id));
+          }
+          await del(U('games',g.id));
+        }else{
+          await set(U('games',g.id),omit(g,['shared']));
+          for(const q of Object.values(raw.sQuests).filter(q=>q.game===g.id)){
+            await set(U('events',q.id),{...omit(q,['shared']),...pick(raw.progress[q.id],PROG_E)});
+            await del(S('sharedQuests',q.id));
+          }
+          await del(S('sharedGames',g.id));
+        }
+      }catch(e){ fail(e); }
+    },
+  };
 
   onAuthStateChanged(auth,u=>{
     unsubs.forEach(f=>f()); unsubs=[];
     user=u;
+    Object.assign(raw,{games:{},events:{},progress:{},follow:{games:[],hidden:[]},sGames:{},sQuests:{}});
     if(!u){
       state.games={}; state.events={};
       $('app').hidden=true; $('fab').hidden=true; $('signin').hidden=false; $('userBox').innerHTML='';
@@ -84,22 +177,36 @@ async function firebaseStore(){
       setSync('','Signed out');
       return;
     }
+    isAdmin=(u.email||'').toLowerCase()===ADMIN_EMAIL; sharingOn=true;
     $('signin').hidden=true; $('app').hidden=false; $('fab').hidden=false;
     const nm=u.displayName||u.email||'';
-    $('userBox').innerHTML=`${u.photoURL?`<img src="${esc(u.photoURL)}" alt="" referrerpolicy="no-referrer">`:`<span class="avatar">${esc(nm.charAt(0).toUpperCase())}</span>`}<span>${esc(nm)}</span>`;
+    $('userBox').innerHTML=`${u.photoURL?`<img src="${esc(u.photoURL)}" alt="" referrerpolicy="no-referrer">`:`<span class="avatar">${esc(nm.charAt(0).toUpperCase())}</span>`}<span>${esc(nm)}</span>${isAdmin?'<span class="admin-badge" title="You can share games with everyone">Super Admin</span>':''}`;
     $('signOutBtn').hidden=false; $('signOutSep').hidden=false;
     $('signOutBtn').onclick=()=>{ closeMenu(); signOut(auth); };
     setSync('warn','Connecting…');
     const live={};
-    const sub=(name,target)=>fs.onSnapshot(fs.collection(db,'users',u.uid,name),{includeMetadataChanges:true},snap=>{
-      const out={}; snap.forEach(d=>{ out[d.id]={...d.data(),id:d.id}; });
-      state[target]=out;
-      live[name]=!snap.metadata.fromCache;
+    const onErr=err=>{ console.error(err); setSync('warn','Sync error: '+err.code); };
+    const status=()=>{
       if(live.games&&live.events) setSync('ok','Synced');
       else setSync('warn', navigator.onLine?'Connecting…':'Offline — will sync later');
-      renderAll();
-    },err=>{ console.error(err); setSync('warn','Sync error: '+err.code); });
-    unsubs.push(sub('games','games'), sub('events','events'));
+    };
+    const sub=(ref,key)=>fs.onSnapshot(ref,{includeMetadataChanges:true},snap=>{
+      const out={}; snap.forEach(d=>{ out[d.id]={...d.data(),id:d.id}; });
+      raw[key]=out; live[key]=!snap.metadata.fromCache;
+      compose(); status(); renderAll();
+    },onErr);
+    unsubs.push(
+      sub(fs.collection(db,'users',u.uid,'games'),'games'),
+      sub(fs.collection(db,'users',u.uid,'events'),'events'),
+      sub(fs.collection(db,'users',u.uid,'progress'),'progress'),
+      sub(fs.collection(db,'sharedGames'),'sGames'),
+      sub(fs.collection(db,'sharedQuests'),'sQuests'),
+      fs.onSnapshot(U('meta','follow'),snap=>{
+        const d=snap.exists()?snap.data():{};
+        raw.follow={games:d.games||[],hidden:d.hidden||[]};
+        compose(); renderAll();
+      },onErr),
+    );
     renderAll();
   });
   return api;
@@ -226,7 +333,7 @@ function openCounts(now){
 
 function renderGameSelect(){
   const gs=gamesSorted(), sel=$('fGame'), cur=sel.value;
-  sel.innerHTML = gs.length ? gs.map(g=>`<option value="${esc(g.id)}">${esc(g.name)}</option>`).join('') : '<option value="">— add a game first —</option>';
+  sel.innerHTML = gs.length ? gs.map(g=>`<option value="${esc(g.id)}">${esc(g.name)}${g.shared&&isAdmin?' 📢':''}</option>`).join('') : '<option value="">— add a game first —</option>';
   if(cur && state.games[cur]) sel.value=cur;
   updateTypeInfo();
 }
@@ -238,7 +345,7 @@ function renderTabs(){
   $('tabs').innerHTML = (gs.length?
     `<button class="tab all ${state.filter==='all'?'on':''}" data-filter="all">All games <span class="n">${total}</span></button>` +
     gs.map(g=>`<button class="tab ${state.filter===g.id?'on':''}" style="--c:${esc(g.color)}" data-filter="${esc(g.id)}">
-      <span class="sw"></span>${esc(g.name)}<span class="n ${hot[g.id]?'hot':''}" ${hot[g.id]?'title="A limited-time quest ends within 24h"':''}>${c[g.id]||0}</span>
+      <span class="sw"></span>${esc(g.name)}${g.shared?`<span class="shared-ic" title="${isAdmin?'Shared with everyone':'Followed from the Super Admin'}">${isAdmin?'📢':'🔗'}</span>`:''}<span class="n ${hot[g.id]?'hot':''}" ${hot[g.id]?'title="A limited-time quest ends within 24h"':''}>${c[g.id]||0}</span>
       <span class="gear" data-editgame="${esc(g.id)}" title="Game settings">⚙</span></button>`).join('') : '') +
     `<button class="tab add" data-action="addgame">+ Add game</button>`;
 }
@@ -287,7 +394,7 @@ function evHtml(e,now){
     </div>
     <div class="right">
       <span class="cd ${done?'gray':u}" ${done?'':`data-t="${o.end}"`}>${done&&!o.ended?'Done ✓':fmtLeft(left)}</span>
-      <div class="acts"><button data-edit="${esc(e.id)}" title="Edit" aria-label="Edit">✎</button><button class="del" data-del="${esc(e.id)}" title="Delete" aria-label="Delete">🗑</button></div>
+      ${actsHtml(e)}
     </div>
     ${!o.ended&&!done?`<i class="tbar" style="width:${pct.toFixed(1)}%" title="Time passed"></i>`:''}
   </div>`;
@@ -313,11 +420,15 @@ function rowHtml(x,showGame,showWhen){
     </div>
     <div class="rright">
       ${showWhen?timeChip(o.end, done, typeOf(e)):''}
-      <div class="acts"><button data-edit="${esc(e.id)}" title="Edit" aria-label="Edit">✎</button><button class="del" data-del="${esc(e.id)}" title="Delete" aria-label="Delete">🗑</button></div>
+      ${actsHtml(e)}
     </div>
   </div>`;
 }
 
+function actsHtml(e){
+  if(!canEdit(e)) return `<div class="acts"><button class="del" data-del="${esc(e.id)}" title="Hide for me" aria-label="Hide for me">🙈</button></div>`;
+  return `<div class="acts"><button data-edit="${esc(e.id)}" title="Edit" aria-label="Edit">✎</button><button class="del" data-del="${esc(e.id)}" title="Delete" aria-label="Delete">🗑</button></div>`;
+}
 // Readable countdown chip, coloured by how soon it is
 // Daily timers are always under 24h, so they only warn in the last few hours
 function chipUrgency(left,kind){
@@ -354,9 +465,9 @@ function emptyState(){
   const hasGames=gamesSorted().length, hasQuests=Object.keys(state.events).length;
   const step=(n,txt,st)=>`<span class="${st}"><i>${st==='ok'?'✓':n}</i>${txt}</span>`;
   if(!hasGames) return `<div class="empty"><div class="emoji">🎮</div><h3>Welcome! Let's set up your games</h3>
-    <p>Add the games you play, then add their quests.</p>
+    <p>${sharingOn&&sharedAvailable().length?'Follow a shared game to get its quests ready-made, or add your own.':'Add the games you play, then add their quests.'}</p>
     <div class="steps">${step(1,'Add a game','cur')}${step(2,'Add quests','')}${step(3,'Never miss one','')}</div>
-    <button class="btn" data-action="addgame">+ Add your first game</button></div>`;
+    <button class="btn" data-action="addgame">${sharingOn&&sharedAvailable().length?'+ Follow or add a game':'+ Add your first game'}</button></div>`;
   if(!hasQuests) return `<div class="empty"><div class="emoji">📜</div><h3>Now add a quest</h3>
     <p>Track limited-time events, or your daily and weekly routines.</p>
     <div class="steps">${step(1,'Add a game','ok')}${step(2,'Add quests','cur')}${step(3,'Never miss one','')}</div>
@@ -473,6 +584,9 @@ function setType(t){
 }
 function updateTypeInfo(){
   const g=state.games[$('fGame').value];
+  const sh=$('shareHint');
+  if(g&&g.shared){ sh.hidden=false; sh.innerHTML=isAdmin?'📢 Shared game: everyone following it will get this quest.':'🔗 Followed game: this quest will be just for you.'; }
+  else sh.hidden=true;
   $('fServerTz').textContent=g?`(${fmtOffset(+g.offset||0)})`:'';
   const info=$('typeInfo');
   if(!g || state.type==='limited'){ info.hidden=true; return; }
@@ -583,6 +697,8 @@ $('evForm').addEventListener('submit',async ev=>{
     created: old && old.created < end ? old.created : Date.now(),
   };
   if(old && JSON.stringify(old.checklist||[])!==JSON.stringify(checklist)) e.checks=[];
+  e.shared = isAdmin && sharingOn ? !!(state.games[game]&&state.games[game].shared) : false;
+  if(old && !!old.shared!==e.shared){ delete state.events[old.id]; await store.deleteEvent(old.id,!!old.shared); }
   state.events[e.id]=e;
   state.lastGame=game;
   const wasEdit=!!old; closeModal('eventModal'); resetForm(); state.quick=null; renderAll();
@@ -605,29 +721,62 @@ $('evForm').addEventListener('submit',async ev=>{
 function openGame(id){
   const g=id?state.games[id]:null;
   state.editGameId=id||null;
-  $('gmTitle').textContent=g?'Edit game':'Add game';
+  const ro=!!(g && !canEdit(g));            // a follower looking at a shared game
+  $('gmTitle').textContent=!g?'Add game':ro?g.name:'Edit game';
+  // Follow list (Add mode only)
+  const avail=(!g && sharingOn)?sharedAvailable():[];
+  $('followBox').hidden=!avail.length;
+  $('followList').innerHTML=avail.map(sg=>{
+    const n=Object.values(raw.sQuests).filter(q=>q.game===sg.id).length;
+    return `<div class="follow-row" style="--c:${esc(sg.color)}"><span class="sw"></span><span class="fname">${esc(sg.name)}</span><span class="fcount">${n} quest${n===1?'':'s'}</span><button type="button" class="btn fbtn" data-follow="${esc(sg.id)}">+ Follow</button></div>`;
+  }).join('');
+  // Read-only info for followers
+  $('followedInfo').hidden=!ro;
+  if(ro){ const hc=hiddenCount(g.id); $('unhideBtn').hidden=!hc; $('unhideBtn').textContent=`Show ${hc} hidden quest${hc===1?'':'s'} again`; }
+  $('gFields').disabled=ro; $('gSave').hidden=ro; $('gCancel').textContent=ro?'Close':'Cancel';
+  // Share toggle (Super Admin only)
+  $('shareRow').hidden=!(isAdmin&&sharingOn);
+  $('gShare').checked=!!(g&&g.shared);
   $('gName').value=g?g.name:'';
   $('gColor').value=g?g.color:PALETTE[Object.keys(state.games).length%PALETTE.length];
   $('gOffset').value=String(g?(+g.offset||0):Math.round(-new Date().getTimezoneOffset()/60));
   $('gDaily').value=g?(g.dailyHour??''):'4';
   $('gWeekly').value=g?(g.weeklyDay??''):'1';
   $('gMonthly').value=String(g&&g.monthlyDay!=null&&g.monthlyDay!==''?g.monthlyDay:1);
-  $('gErr').textContent=''; $('gDelete').hidden=!g;
-  openModal('gameModal'); setTimeout(()=>{ if(!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) $('gName').focus(); },50);
+  $('gErr').textContent='';
+  $('gDelete').hidden=!g;
+  $('gDelete').textContent=ro?'Unfollow this game':(g&&g.shared?'Remove this shared game':'Remove this game');
+  openModal('gameModal');
+  if(!ro && !avail.length) setTimeout(()=>{ if(!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) $('gName').focus(); },50);
 }
 const closeGame=()=>closeModal('gameModal');
 $('gForm').addEventListener('submit',async ev=>{
   ev.preventDefault();
   if(!store) return toast('Still loading…');
+  const old=state.editGameId?state.games[state.editGameId]:null;
+  if(old && !canEdit(old)) return closeGame();
   const name=$('gName').value.trim();
   if(!name) return $('gErr').textContent='Enter the game name.';
   if(Object.values(state.games).some(g=>g.id!==state.editGameId&&g.name.toLowerCase()===name.toLowerCase())) return $('gErr').textContent='That game is already on the list.';
-  const old=state.editGameId?state.games[state.editGameId]:null;
   const num=v=>v===''?null:+v;
   const g={...(old||{}), id:old?old.id:'g_'+uid(), name, color:$('gColor').value,
     offset:+$('gOffset').value, dailyHour:num($('gDaily').value), weeklyDay:num($('gWeekly').value), monthlyDay:+$('gMonthly').value,
-    created:old?.created||Date.now()};
-  state.games[g.id]=g; closeGame(); renderAll(); if(!old) $('fGame').value=g.id; updateTypeInfo();
+    created:old?.created||Date.now(), shared:!!(old&&old.shared)};
+  const wantShare=isAdmin&&sharingOn&&$('gShare').checked;
+  closeGame();
+  if(isAdmin && sharingOn && wantShare!==g.shared){
+    if(wantShare){
+      state.games[g.id]={...g,shared:true}; renderAll();
+      await store.shareGame(g,true); toast(`📢 “${g.name}” is now shared`);
+    }else{
+      ask('Stop sharing?',`Followers will no longer see “${g.name}” or its quests. You keep your copy.`,async()=>{
+        state.games[g.id]={...g,shared:false}; renderAll();
+        await store.shareGame({...g,shared:false},false); toast('Game is private again');
+      },'Stop sharing');
+    }
+    return;
+  }
+  state.games[g.id]=g; renderAll(); if(!old) $('fGame').value=g.id; updateTypeInfo();
   toast(old?'Game updated':'Game added');
   await store.saveGame(g);
 });
@@ -635,11 +784,21 @@ $('gDelete').onclick=()=>{
   const g=state.games[state.editGameId]; if(!g) return;
   const evs=Object.values(state.events).filter(e=>e.game===g.id);
   closeGame();
-  ask('Remove game?',`“${g.name}”${evs.length?` and its ${evs.length} quest(s)`:''} will be removed.`,async()=>{
+  if(g.shared && !isAdmin){
+    const own=evs.filter(e=>!e.shared);
+    ask('Unfollow game?',`“${g.name}” and its shared quests will disappear from your tracker.${own.length?` Your own ${own.length} quest(s) in it will be removed too.`:''}`,async()=>{
+      for(const e of own) await store.deleteEvent(e.id,false);
+      await store.unfollow(g.id); toast(`Unfollowed “${g.name}”`);
+    },'Unfollow');
+    return;
+  }
+  ask(g.shared?'Remove shared game?':'Remove game?',
+    `“${g.name}”${evs.length?` and its ${evs.length} quest(s)`:''} will be removed${g.shared?' for you and everyone following it':''}.`,async()=>{
     delete state.games[g.id]; evs.forEach(e=>delete state.events[e.id]); renderAll();
-    await store.deleteGame(g.id); for(const e of evs) await store.deleteEvent(e.id);
+    await store.deleteGame(g.id,g.shared); for(const e of evs) await store.deleteEvent(e.id,e.shared);
   });
 };
+$('unhideBtn').onclick=async()=>{ const id=state.editGameId; closeGame(); await store.unhide(id); toast('Hidden quests are back'); };
 
 /* ---------------- Confirm dialog ---------------- */
 let confirmFn=null;
@@ -653,7 +812,7 @@ async function updateEvent(id,fn){ const e=state.events[id]; if(!e) return; cons
 document.addEventListener('click',async ev=>{
   const close=ev.target.closest('[data-close]');
   if(close){ closeModal(close.dataset.close); return; }
-  const t=ev.target.closest('[data-toggle],[data-edit],[data-del],[data-editgame],[data-filter],[data-daily],[data-cnt],[data-action],[data-quick],[data-cat],[data-collapse],#clearEnded');
+  const t=ev.target.closest('[data-toggle],[data-edit],[data-del],[data-editgame],[data-filter],[data-daily],[data-cnt],[data-action],[data-quick],[data-cat],[data-collapse],[data-follow],#clearEnded');
   if(!t) return;
   const d=t.dataset;
   if(d.quick){ state.quick = state.quick===d.quick ? null : d.quick; renderList(); renderStats(); return; }
@@ -661,18 +820,21 @@ document.addEventListener('click',async ev=>{
   if(d.collapse==='resets'){ state.resetsOpen=!state.resetsOpen; prefSet('resetsOpen',state.resetsOpen); renderResets(); return; }
   if(d.filter && !d.editgame){ state.filter=d.filter; renderTabs(); renderResets(); renderList(); renderStats(); return; }
   if(!store) return toast('Still loading…');
-  if(d.editgame){ ev.stopPropagation(); openGame(d.editgame); }
+  if(d.follow){ const sg=raw.sGames[d.follow]; await store.follow(d.follow); toast(`🔗 Following “${sg?sg.name:'game'}”`);
+    if(sharedAvailable().length) openGame(null); else closeGame(); }
+  else if(d.editgame){ ev.stopPropagation(); openGame(d.editgame); }
   else if(d.action==='addgame') openGame(null);
   else if(d.action==='newevent') newEvent(d.type);
   else if(d.toggle) await updateEvent(d.toggle,(e,o)=>{ e.doneFor=isDone(e,o)?null:o.end; return e; });
   else if(d.cnt) await updateEvent(d.cnt,(e,o)=>{ e.count=Math.max(0,Math.min(+e.goal||0,getCount(e,o)+(+d.d))); e.countFor=o.end; return e; });
   else if(d.edit) startEdit(d.edit);
   else if(d.del){ const e=state.events[d.del]; if(!e) return;
-    ask('Delete quest?',`“${e.name}” will be removed.`,async()=>{ delete state.events[e.id]; renderAll(); await store.deleteEvent(e.id); }); }
+    if(!canEdit(e)) ask('Hide quest?',`“${e.name}” will be hidden from your tracker. You can show it again from the game's ⚙ settings.`,async()=>{ delete state.events[e.id]; renderAll(); await store.deleteEvent(e.id,true); },'Hide');
+    else ask('Delete quest?',`“${e.name}” will be removed${e.shared?' for you and everyone following this game':''}.`,async()=>{ delete state.events[e.id]; renderAll(); await store.deleteEvent(e.id,e.shared); }); }
   else if(d.daily){ const g=state.games[d.daily]; if(!g) return; const dl=nextDaily(g,Date.now());
     const n={...g, dailyDoneFor: g.dailyDoneFor===dl?null:dl}; state.games[g.id]=n; renderAll(); await store.saveGame(n); }
   else if(t.id==='clearEnded'){ const now=Date.now(), ended=Object.values(state.events).filter(e=>occ(e,now).ended);
-    ask('Clear ended quests?',`${ended.length} ended quest(s) will be removed.`,async()=>{ ended.forEach(e=>delete state.events[e.id]); renderAll(); for(const e of ended) await store.deleteEvent(e.id); }); }
+    ask('Clear ended quests?',`${ended.length} ended quest(s) will be removed.`,async()=>{ ended.forEach(e=>delete state.events[e.id]); renderAll(); for(const e of ended) await store.deleteEvent(e.id,e.shared); }); }
 });
 document.addEventListener('change',async ev=>{
   const t=ev.target;
@@ -689,7 +851,8 @@ document.addEventListener('keydown',e=>{
 /* ---------------- Backup ---------------- */
 $('exportBtn').onclick=()=>{
   closeMenu();
-  const data=JSON.stringify({app:'game-event-tracker',version:2,exported:new Date().toISOString(),games:state.games,events:state.events},null,2);
+  const own=o=>Object.fromEntries(Object.entries(o).filter(([k,v])=>!v.shared));
+  const data=JSON.stringify({app:'game-event-tracker',version:2,exported:new Date().toISOString(),games:own(state.games),events:own(state.events)},null,2);
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));
   a.download=`game-events-${new Date().toISOString().slice(0,10)}.json`;
@@ -700,7 +863,7 @@ $('importFile').addEventListener('change',async ev=>{
   const file=ev.target.files[0]; ev.target.value=''; if(!file) return;
   let d; try{ d=JSON.parse(await file.text()); }catch(e){ return toast('That file is not a valid backup.'); }
   if(!d || d.app!=='game-event-tracker' || typeof d.games!=='object' || typeof d.events!=='object') return toast('That file is not a tracker backup.');
-  const gs=Object.values(d.games), es=Object.values(d.events);
+  const gs=Object.values(d.games).map(g=>omit(g,['shared'])), es=Object.values(d.events).map(e=>omit(e,['shared']));
   ask('Import backup?',`Adds ${gs.length} game(s) and ${es.length} quest(s). Items with the same ID are replaced.`,async()=>{
     gs.forEach(g=>state.games[g.id]=g); es.forEach(e=>state.events[e.id]=e); renderAll();
     for(const g of gs) await store.saveGame(g);

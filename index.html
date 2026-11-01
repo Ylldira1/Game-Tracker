@@ -84,6 +84,7 @@
     <form id="evForm" autocomplete="off">
       <label>Game</label>
       <select id="fGame"></select>
+      <div class="share-hint" id="shareHint" hidden></div>
       <label>Type</label>
       <div class="seg type-seg" id="typeSeg">
         <button type="button" data-type="limited" class="on">⏳ Limited-time</button>
@@ -174,7 +175,18 @@
       <h2 id="gmTitle">Add game</h2>
       <button class="icon-btn" type="button" data-close="gameModal" aria-label="Close">✕</button>
     </div>
+    <div class="follow-box" id="followBox" hidden>
+      <div class="follow-title">🔗 Follow a shared game</div>
+      <div class="hint" style="margin:0 0 8px">Its quests appear for you automatically. Your progress stays your own.</div>
+      <div id="followList"></div>
+      <div class="or"><span>or create your own</span></div>
+    </div>
+    <div class="followed-info" id="followedInfo" hidden>
+      🔗 You're following this game. Its quests are added and updated by the Super Admin, and your progress is your own.
+      <button type="button" class="linkbtn" id="unhideBtn" hidden></button>
+    </div>
     <form id="gForm" autocomplete="off">
+      <fieldset id="gFields">
       <div class="row" style="align-items:flex-end">
         <div style="flex:4"><label>Name</label><input id="gName" maxlength="40" placeholder="e.g. Genshin Impact"></div>
         <div style="flex:none"><label>Color</label><input id="gColor" type="color"></div>
@@ -189,10 +201,12 @@
       <label>Monthly reset</label>
       <select id="gMonthly"></select>
       <div class="hint">In server time. Many games reset at 4:00 AM, monthly on the 1st.</div>
+      <label class="share-row" id="shareRow" hidden><input type="checkbox" id="gShare"> <span>📢 <b>Share with all users</b><br><small>Anyone can follow this game and get its quests automatically.</small></span></label>
+      </fieldset>
       <div class="err" id="gErr"></div>
       <div class="row" style="margin-top:16px">
-        <button class="btn ghost" type="button" data-close="gameModal">Cancel</button>
-        <button class="btn" type="submit">Save</button>
+        <button class="btn ghost" type="button" data-close="gameModal" id="gCancel">Cancel</button>
+        <button class="btn" type="submit" id="gSave">Save</button>
       </div>
       <button class="btn danger-link" type="button" id="gDelete" hidden>Remove this game</button>
     </form>

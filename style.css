@@ -268,3 +268,25 @@ summary{cursor:pointer;font-size:13px;color:var(--accent2)}
 .tchip.red{border-color:rgba(255,93,108,.5);background:rgba(255,93,108,.08)} .tchip.red b{color:var(--red)}
 .tchip.gray b{color:var(--muted)}
 @media (max-width:760px){ .qrow .rright{flex-direction:column;align-items:flex-end;gap:6px} }
+
+/* Sharing */
+fieldset{border:0;margin:0;padding:0;min-width:0}
+fieldset:disabled{opacity:.6}
+.admin-badge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;background:linear-gradient(90deg,#7c5cff,#ff5d8f);color:#fff;padding:3px 7px;border-radius:6px}
+.shared-ic{font-size:12px}
+.share-hint{margin-top:6px;font-size:12.5px;color:var(--accent2)}
+.share-row{display:flex;gap:10px;align-items:flex-start;margin-top:14px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);cursor:pointer;color:var(--text);font-size:13.5px}
+.share-row input{width:auto;margin-top:3px}
+.share-row small{color:var(--muted);font-size:12px}
+.follow-box{margin:10px 0 4px}
+.follow-title{font-weight:600;margin-bottom:4px}
+.follow-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--line);border-left:3px solid var(--c);border-radius:10px;margin-bottom:6px;background:var(--panel2)}
+.follow-row .sw{display:none}
+.follow-row .fname{flex:1;font-weight:500}
+.follow-row .fcount{font-size:12px;color:var(--muted)}
+.fbtn{width:auto;padding:6px 12px;font-size:13px}
+.or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px;margin:14px 0 2px}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.followed-info{margin:10px 0 4px;font-size:13px;color:var(--muted);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;line-height:1.5}
+.followed-info .linkbtn{display:block;margin-top:6px;padding:2px 0}
+@media (max-width:760px){ .admin-badge{display:none} }
