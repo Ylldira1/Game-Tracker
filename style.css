@@ -301,3 +301,4 @@ fieldset:disabled{opacity:.6}
 .person small{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis}
 .person:has(input:checked){border-color:var(--accent)}
 .avatar.sm{width:28px;height:28px;font-size:12px;flex:none}
+#nameModal .card{max-width:400px}

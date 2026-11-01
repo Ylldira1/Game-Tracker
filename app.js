@@ -187,15 +187,15 @@ async function firebaseStore(){
     if(!u){
       state.games={}; state.events={};
       $('app').hidden=true; $('fab').hidden=true; $('signin').hidden=false; $('userBox').innerHTML='';
-      $('signOutBtn').hidden=true; $('signOutSep').hidden=true;
+      $('signOutBtn').hidden=true; $('signOutSep').hidden=true; $('nameBtn').hidden=true;
       setSync('','Signed out');
       return;
     }
     isAdmin=(u.email||'').toLowerCase()===ADMIN_EMAIL; sharingOn=true;
     $('signin').hidden=true; $('app').hidden=false; $('fab').hidden=false;
-    const nm=u.displayName||u.email||'';
-    $('userBox').innerHTML=`${u.photoURL?`<img src="${esc(u.photoURL)}" alt="" referrerpolicy="no-referrer">`:`<span class="avatar">${esc(nm.charAt(0).toUpperCase())}</span>`}<span>${esc(nm)}</span>${isAdmin?'<span class="admin-badge" title="You can share games with everyone">Super Admin</span>':''}`;
-    $('signOutBtn').hidden=false; $('signOutSep').hidden=false;
+    state.googleName=u.displayName||u.email||''; state.displayName=''; state.photo=u.photoURL||'';
+    renderUser();
+    $('signOutBtn').hidden=false; $('signOutSep').hidden=false; $('nameBtn').hidden=false;
     $('signOutBtn').onclick=()=>{ closeMenu(); signOut(auth); };
     setSync('warn','Connecting…');
     const live={};
@@ -234,7 +234,9 @@ async function firebaseStore(){
       });
     }
     // Let the Super Admin see who has signed in (for picking people to share with)
-    set(fs.doc(db,'profiles',u.uid),{email,name:u.displayName||'',photo:u.photoURL||'',lastSeen:Date.now()}).catch(()=>{});
+    const writeProfile=()=>set(fs.doc(db,'profiles',u.uid),{email,name:state.displayName||u.displayName||'',photo:u.photoURL||'',lastSeen:Date.now()}).catch(()=>{});
+    let profileWritten=false;
+    api.saveName=async name=>{ state.displayName=name; renderUser(); await set(U('meta','profile'),{name}).catch(fail); writeProfile(); };
     unsubs.push(
       sub(fs.collection(db,'users',u.uid,'games'),'games'),
       sub(fs.collection(db,'users',u.uid,'events'),'events'),
@@ -242,6 +244,10 @@ async function firebaseStore(){
       ...sharedSubs('sharedGames'),
       ...sharedSubs('sharedQuests'),
       ...(isAdmin?[sub(fs.collection(db,'profiles'),'profiles')]:[]),
+      fs.onSnapshot(U('meta','profile'),snap=>{
+        state.displayName=(snap.exists()&&snap.data().name)||''; renderUser();
+        if(!profileWritten){ profileWritten=true; writeProfile(); }
+      },onErr),
       fs.onSnapshot(U('meta','follow'),snap=>{
         const d=snap.exists()?snap.data():{};
         raw.follow={games:d.games||[],hidden:d.hidden||[],left:d.left||[]};
@@ -924,9 +930,29 @@ document.addEventListener('change',async ev=>{
     await updateEvent(t.dataset.chk,(e,o)=>{ const c=new Set(getChecks(e,o)); t.checked?c.add(i):c.delete(i); e.checks=[...c].sort((a,b)=>a-b); e.checkFor=o.end; return e; }); }
 });
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){ ['eventModal','gameModal','confirm'].forEach(closeModal); closeMenu(); return; }
+  if(e.key==='Escape'){ ['eventModal','gameModal','confirm','nameModal'].forEach(closeModal); closeMenu(); return; }
   const typing=/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
   if(!typing && (e.key==='n'||e.key==='N') && !document.querySelector('.modal.show') && !$('app').hidden){ e.preventDefault(); newEvent(); }
+});
+
+/* ---------------- Display name ---------------- */
+function renderUser(){
+  const nm=state.displayName||state.googleName||'';
+  $('userBox').innerHTML=`${state.photo?`<img src="${esc(state.photo)}" alt="" referrerpolicy="no-referrer">`:`<span class="avatar">${esc(nm.charAt(0).toUpperCase())}</span>`}<span>${esc(nm)}</span>${isAdmin?'<span class="admin-badge" title="You can share games with others">Super Admin</span>':''}`;
+}
+$('nameBtn').onclick=()=>{
+  closeMenu();
+  $('nName').value=state.displayName||state.googleName||''; $('nErr').textContent='';
+  $('nHint').textContent=`Your Google name is “${state.googleName||'—'}”. Leave empty to use it.`;
+  openModal('nameModal'); setTimeout(()=>{ $('nName').focus(); $('nName').select(); },50);
+};
+$('nameForm').addEventListener('submit',async ev=>{
+  ev.preventDefault();
+  let name=$('nName').value.replace(/\s+/g,' ').trim();
+  if(name===state.googleName) name='';
+  if(name.length>30) return $('nErr').textContent='Keep it under 30 characters.';
+  closeModal('nameModal');
+  if(store.saveName){ await store.saveName(name); toast('Display name updated'); }
 });
 
 /* ---------------- Backup ---------------- */

@@ -25,6 +25,7 @@
         <div class="menu" id="menu" hidden>
           <button id="exportBtn">⬇ Export backup</button>
           <label class="menu-item">⬆ Import backup<input type="file" id="importFile" accept=".json,application/json" hidden></label>
+          <button id="nameBtn" hidden>✏️ Change display name</button>
           <div class="menu-sep" id="signOutSep" hidden></div>
           <button id="signOutBtn" hidden>Sign out</button>
         </div>
@@ -223,6 +224,26 @@
         <button class="btn" type="submit" id="gSave">Save</button>
       </div>
       <button class="btn danger-link" type="button" id="gDelete" hidden>Remove this game</button>
+    </form>
+  </div>
+</div>
+
+<!-- Display name -->
+<div class="modal" id="nameModal">
+  <div class="card">
+    <div class="modal-head">
+      <h2>Display name</h2>
+      <button class="icon-btn" type="button" data-close="nameModal" aria-label="Close">✕</button>
+    </div>
+    <form id="nameForm" autocomplete="off">
+      <label>Name shown in the tracker</label>
+      <input id="nName" maxlength="30" placeholder="e.g. Daryll">
+      <div class="hint" id="nHint"></div>
+      <div class="err" id="nErr"></div>
+      <div class="row" style="margin-top:16px">
+        <button class="btn ghost" type="button" data-close="nameModal">Cancel</button>
+        <button class="btn" type="submit">Save</button>
+      </div>
     </form>
   </div>
 </div>
