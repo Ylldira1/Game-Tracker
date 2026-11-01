@@ -124,9 +124,30 @@ function nextWeekly(g,now){
 // Current round of an event (handles repeating events without writing anything)
 function resetCfg(g){
   g=g||{}; const blank=v=>v==null||v==='';
-  return { offset: blank(g.offset)?8:+g.offset, dailyHour: blank(g.dailyHour)?4:+g.dailyHour, weeklyDay: blank(g.weeklyDay)?1:+g.weeklyDay };
+  return { offset: blank(g.offset)?8:+g.offset, dailyHour: blank(g.dailyHour)?4:+g.dailyHour, weeklyDay: blank(g.weeklyDay)?1:+g.weeklyDay, monthlyDay: blank(g.monthlyDay)?1:+g.monthlyDay };
+}
+// Monthly reset: given day of month (clamped to month length) at the daily reset hour, server time
+function monthlyAt(g,y,m){
+  const o=(+g.offset||0)*H, hr=(g.dailyHour==null||g.dailyHour==='')?0:+g.dailyHour;
+  const last=new Date(Date.UTC(y,m+1,0)).getUTCDate();
+  return Date.UTC(y,m,Math.min(+g.monthlyDay||1,last),hr)-o;
+}
+function nextMonthly(g,now){
+  if(g.monthlyDay==null || g.monthlyDay==='') return null;
+  const s=new Date(now+(+g.offset||0)*H);
+  let t=monthlyAt(g,s.getUTCFullYear(),s.getUTCMonth());
+  if(t<=now) t=monthlyAt(g,s.getUTCFullYear(),s.getUTCMonth()+1);
+  return t;
+}
+function prevMonthly(g,next){
+  const s=new Date(next+(+g.offset||0)*H);
+  return monthlyAt(g,s.getUTCFullYear(),s.getUTCMonth()-1);
 }
 function occ(e,now){
+  if(e.type==='monthly'){
+    const g=resetCfg(state.games[e.game]), end=nextMonthly(g,now);
+    return { end, start: prevMonthly(g,end), ended:false };
+  }
   if(e.type==='daily'||e.type==='weekly'){
     const g=resetCfg(state.games[e.game]), wk=e.type==='weekly';
     const end = wk ? nextWeekly(g,now) : nextDaily(g,now);
@@ -164,7 +185,9 @@ const TYPES = {
   limited:{label:'Limited-time', icon:'⏳'},
   daily:  {label:'Daily', icon:'☀️'},
   weekly: {label:'Weekly', icon:'📅'},
+  monthly:{label:'Monthly', icon:'🗓️'},
 };
+const ROUTINES=['daily','weekly','monthly'];
 const typeOf = e => TYPES[e.type] ? e.type : 'limited';
 const isLimitedOpen = (x)=> typeOf(x.e)==='limited' && !x.o.ended && !isDone(x.e,x.o);
 const QUICK = {
@@ -213,6 +236,8 @@ function renderResets(){
   if(!gs.length){ $('resets').innerHTML=''; return; }
   const cards = gs.map(g=>{
     const dl=nextDaily(g,now), wk=nextWeekly(g,now);
+    const hasMo=Object.values(state.events).some(e=>e.game===g.id&&e.type==='monthly');
+    const mo=hasMo?nextMonthly(resetCfg(g),now):null;
     const dq=Object.values(state.events).filter(e=>e.game===g.id&&typeOf(e)==='daily');
     let badge='';
     if(dq.length){
@@ -224,7 +249,7 @@ function renderResets(){
     }
     return `<div class="reset" style="--c:${esc(g.color)}">
       <div class="rn"><span class="sw"></span><span class="rname">${esc(g.name)}</span>${badge}</div>
-      <div class="rl">${dl?`<span>Daily <b data-t="${dl}">${fmtLeft(dl-now)}</b></span>`:''}${wk?`<span>Weekly <b data-t="${wk}" data-fmt="${wk-now<D?'':'s'}">${wk-now<D?fmtLeft(wk-now):fmtShort(wk-now)}</b></span>`:''}</div>
+      <div class="rl">${dl?`<span>Daily <b data-t="${dl}">${fmtLeft(dl-now)}</b></span>`:''}${wk?`<span>Weekly <b data-t="${wk}" data-fmt="${wk-now<D?'':'s'}">${wk-now<D?fmtLeft(wk-now):fmtShort(wk-now)}</b></span>`:''}${mo?`<span>Monthly <b data-t="${mo}" data-fmt="${mo-now<D?'':'s'}">${mo-now<D?fmtLeft(mo-now):fmtShort(mo-now)}</b></span>`:''}</div>
     </div>`;}).join('');
   $('resets').innerHTML = `<button class="section toggle-sec" data-collapse="resets" aria-expanded="${state.resetsOpen}">
       <span class="caret">${state.resetsOpen?'▾':'▸'}</span> Resets</button>
@@ -313,7 +338,7 @@ function emptyState(){
 
 function renderCats(now){
   const ev=scoped(now), n=t=>ev.filter(x=>typeOf(x.e)===t&&!x.o.ended&&!isDone(x.e,x.o)).length;
-  const items=[['all','All',null],['limited','⏳ Limited',n('limited')],['daily','☀️ Daily',n('daily')],['weekly','📅 Weekly',n('weekly')]];
+  const items=[['all','All',null],['limited','<span class="ic">⏳</span> Limited',n('limited')],['daily','<span class="ic">☀️</span> Daily',n('daily')],['weekly','<span class="ic">📅</span> Weekly',n('weekly')],['monthly','<span class="ic">🗓️</span> Monthly',n('monthly')]];
   $('cats').innerHTML=items.map(([k,l,c])=>`<button class="${state.cat===k?'on':''}" data-cat="${k}">${l}${c?` <span class="n">${c}</span>`:''}</button>`).join('');
 }
 
@@ -336,16 +361,16 @@ function renderList(){
   if(empty){ $('list').innerHTML=empty; $('showDoneWrap').hidden=true; return; }
 
   const lim=evs.filter(x=>typeOf(x.e)==='limited');
-  const daily=evs.filter(x=>typeOf(x.e)==='daily'), weekly=evs.filter(x=>typeOf(x.e)==='weekly');
+  const byType={}; ROUTINES.forEach(t=>byType[t]=evs.filter(x=>typeOf(x.e)===t));
   const showLim = state.cat==='all'||state.cat==='limited';
   $('showDoneWrap').hidden=!showLim;
 
   let html='';
-  if(state.cat==='all' && (daily.length||weekly.length)){
-    html+=`<div class="panels">${routinePanel('daily',daily,now)}${routinePanel('weekly',weekly,now)}</div>`;
+  if(state.cat==='all'){
+    const used=ROUTINES.filter(t=>byType[t].length);
+    if(used.length) html+=`<div class="panels n${used.length}">${used.map(t=>routinePanel(t,byType[t],now)).join('')}</div>`;
   }
-  if(state.cat==='daily') html+=routinePanel('daily',daily,now,true);
-  if(state.cat==='weekly') html+=routinePanel('weekly',weekly,now,true);
+  if(ROUTINES.includes(state.cat)) html+=routinePanel(state.cat,byType[state.cat],now,true);
 
   if(showLim){
     const open=lim.filter(x=>!x.o.ended&&!isDone(x.e,x.o)).sort(byEnd);
@@ -407,7 +432,8 @@ function setMode(m){
   $('modeLeft').hidden=m!=='left'; $('modeDate').hidden=m!=='date';
 }
 function setPrio(p){ state.prio=p; document.querySelectorAll('#prioSeg button').forEach(b=>b.classList.toggle('on',b.dataset.p===p)); }
-const PLACEHOLDER={limited:'e.g. Halloween Gacha Banner', daily:'e.g. Daily commissions', weekly:'e.g. Weekly boss'};
+const PLACEHOLDER={limited:'e.g. Halloween Gacha Banner', daily:'e.g. Daily commissions', weekly:'e.g. Weekly boss', monthly:'e.g. Monthly shop'};
+const ordinal=n=>n+(['th','st','nd','rd'][(n%100>10&&n%100<14)?0:n%10]||'th');
 function setType(t){
   state.type=t;
   document.querySelectorAll('#typeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.type===t));
@@ -421,10 +447,11 @@ function updateTypeInfo(){
   const info=$('typeInfo');
   if(!g || state.type==='limited'){ info.hidden=true; return; }
   const gg=resetCfg(g), now=Date.now(), hr=+gg.dailyHour, hh=`${hr%12||12}:00 ${hr<12?'AM':'PM'}`;
-  const nxt = state.type==='daily' ? nextDaily(gg,now) : nextWeekly(gg,now);
-  info.innerHTML = state.type==='daily'
-    ? `☀️ Resets every day at <b>${hh}</b> (${esc(g.name)} server time). Next reset in <b>${fmtShort(nxt-now)}</b>.`
-    : `📅 Resets every <b>${DAYS[+gg.weeklyDay]}</b> at <b>${hh}</b> (${esc(g.name)} server time). Next reset in <b>${fmtShort(nxt-now)}</b>.`;
+  const nxt = state.type==='daily' ? nextDaily(gg,now) : state.type==='weekly' ? nextWeekly(gg,now) : nextMonthly(gg,now);
+  const when = state.type==='daily' ? `every day at <b>${hh}</b>`
+    : state.type==='weekly' ? `every <b>${DAYS[+gg.weeklyDay]}</b> at <b>${hh}</b>`
+    : `on the <b>${ordinal(+gg.monthlyDay)}</b> of every month at <b>${hh}</b>`;
+  info.innerHTML = `${TYPES[state.type].icon} Resets ${when} (${esc(g.name)} server time). Next reset in <b>${fmtShort(nxt-now)}</b>.`;
   info.hidden=false;
 }
 function setRepeatField(r){
@@ -495,7 +522,7 @@ $('evForm').addEventListener('submit',async ev=>{
     if($('fRepeat').value==='custom' && repeat<1) return err('Enter how many days between repeats.');
   }else{
     const gg=resetCfg(state.games[game]);
-    end = type==='daily' ? nextDaily(gg,Date.now()) : nextWeekly(gg,Date.now());
+    end = type==='daily' ? nextDaily(gg,Date.now()) : type==='weekly' ? nextWeekly(gg,Date.now()) : nextMonthly(gg,Date.now());
   }
   const goal=Math.max(0,Math.round(+$('fGoal').value||0));
   const checklist=$('fChecklist').value.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,30);
@@ -522,6 +549,8 @@ $('evForm').addEventListener('submit',async ev=>{
   for(let i=0;i<24;i++){ const hr=i%12||12; h+=`<option value="${i}">${hr}:00 ${i<12?'AM':'PM'}</option>`; }
   $('gDaily').innerHTML=h;
   $('gWeekly').innerHTML='<option value="">No weekly reset</option>'+DAYS.map((d,i)=>`<option value="${i}">${d}</option>`).join('');
+  h=''; for(let i=1;i<=31;i++) h+=`<option value="${i}">${ordinal(i)} of the month</option>`;
+  $('gMonthly').innerHTML=h;
 })();
 
 function openGame(id){
@@ -533,6 +562,7 @@ function openGame(id){
   $('gOffset').value=String(g?(+g.offset||0):Math.round(-new Date().getTimezoneOffset()/60));
   $('gDaily').value=g?(g.dailyHour??''):'4';
   $('gWeekly').value=g?(g.weeklyDay??''):'1';
+  $('gMonthly').value=String(g&&g.monthlyDay!=null&&g.monthlyDay!==''?g.monthlyDay:1);
   $('gErr').textContent=''; $('gDelete').hidden=!g;
   openModal('gameModal'); setTimeout(()=>{ if(!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) $('gName').focus(); },50);
 }
@@ -546,7 +576,7 @@ $('gForm').addEventListener('submit',async ev=>{
   const old=state.editGameId?state.games[state.editGameId]:null;
   const num=v=>v===''?null:+v;
   const g={...(old||{}), id:old?old.id:'g_'+uid(), name, color:$('gColor').value,
-    offset:+$('gOffset').value, dailyHour:num($('gDaily').value), weeklyDay:num($('gWeekly').value),
+    offset:+$('gOffset').value, dailyHour:num($('gDaily').value), weeklyDay:num($('gWeekly').value), monthlyDay:+$('gMonthly').value,
     created:old?.created||Date.now()};
   state.games[g.id]=g; closeGame(); renderAll(); if(!old) $('fGame').value=g.id; updateTypeInfo();
   toast(old?'Game updated':'Game added');

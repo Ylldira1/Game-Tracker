@@ -89,6 +89,7 @@
         <button type="button" data-type="limited" class="on">⏳ Limited-time</button>
         <button type="button" data-type="daily">☀️ Daily</button>
         <button type="button" data-type="weekly">📅 Weekly</button>
+        <button type="button" data-type="monthly">🗓️ Monthly</button>
       </div>
       <div class="type-info" id="typeInfo" hidden></div>
 
@@ -181,7 +182,9 @@
         <div><label>Daily reset</label><select id="gDaily"></select></div>
         <div><label>Weekly reset</label><select id="gWeekly"></select></div>
       </div>
-      <div class="hint">In server time. Many games reset at 4:00 AM.</div>
+      <label>Monthly reset</label>
+      <select id="gMonthly"></select>
+      <div class="hint">In server time. Many games reset at 4:00 AM, monthly on the 1st.</div>
       <div class="err" id="gErr"></div>
       <div class="row" style="margin-top:16px">
         <button class="btn ghost" type="button" data-close="gameModal">Cancel</button>
