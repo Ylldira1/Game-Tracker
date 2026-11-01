@@ -262,7 +262,7 @@ function renderResets(){
     }
     return `<div class="reset" style="--c:${esc(g.color)}">
       <div class="rn"><span class="sw"></span><span class="rname">${esc(g.name)}</span>${badge}</div>
-      <div class="rl">${dl?`<span>Daily <b data-t="${dl}">${fmtLeft(dl-now)}</b></span>`:''}${wk?`<span>Weekly <b data-t="${wk}" data-fmt="${wk-now<D?'':'s'}">${wk-now<D?fmtLeft(wk-now):fmtShort(wk-now)}</b></span>`:''}${mo?`<span>Monthly <b data-t="${mo}" data-fmt="${mo-now<D?'':'s'}">${mo-now<D?fmtLeft(mo-now):fmtShort(mo-now)}</b></span>`:''}</div>
+      ${[['Daily',dl],['Weekly',wk],['Monthly',mo]].filter(r=>r[1]).map(([l,t])=>`<div class="rl"><span>${l}</span><b data-t="${t}" data-fmt="${t-now<D?'':'s'}">${t-now<D?fmtLeft(t-now):fmtShort(t-now)}</b></div>`).join('')}
     </div>`;}).join('');
   $('resets').innerHTML = `<button class="section toggle-sec" data-collapse="resets" aria-expanded="${state.resetsOpen}">
       <span class="caret">${state.resetsOpen?'▾':'▸'}</span> Resets</button>
@@ -308,11 +308,25 @@ function rowHtml(x,showGame,showWhen){
   return `<div class="qrow ${done?'done':''}" style="--c:${esc(g.color)}">
     <button class="chk sm ${done?'on':''}" data-toggle="${esc(e.id)}" title="${done?'Mark as not done':'Mark as done'}">${done?'✓':''}</button>
     <div class="body">
-      <div class="t"><span class="nm">${esc(e.name)}</span>${showGame?`<span class="gpill"><span class="sw"></span>${esc(g.name)}</span>`:''}${showWhen&&!done?`<span class="rwhen">resets in <b data-t="${o.end}" data-fmt="${o.end-Date.now()<D?'':'s'}">${o.end-Date.now()<D?fmtLeft(o.end-Date.now()):fmtShort(o.end-Date.now())}</b></span>`:''}</div>
+      <div class="t"><span class="nm">${esc(e.name)}</span>${showGame?`<span class="gpill"><span class="sw"></span>${esc(g.name)}</span>`:''}</div>
       ${extra}
     </div>
-    <div class="acts"><button data-edit="${esc(e.id)}" title="Edit" aria-label="Edit">✎</button><button class="del" data-del="${esc(e.id)}" title="Delete" aria-label="Delete">🗑</button></div>
+    <div class="rright">
+      ${showWhen?timeChip(o.end, done, typeOf(e)):''}
+      <div class="acts"><button data-edit="${esc(e.id)}" title="Edit" aria-label="Edit">✎</button><button class="del" data-del="${esc(e.id)}" title="Delete" aria-label="Delete">🗑</button></div>
+    </div>
   </div>`;
+}
+
+// Readable countdown chip, coloured by how soon it is
+// Daily timers are always under 24h, so they only warn in the last few hours
+function chipUrgency(left,kind){
+  if(kind==='daily') return left<2*H?'red':left<6*H?'amber':'plain';
+  return urgency(left);
+}
+function timeChip(t, muted, kind){
+  const left=t-Date.now(), u=muted?'gray':chipUrgency(left,kind), short=left>=D;
+  return `<span class="tchip ${u}" title="Resets ${esc(fmtDate(t))}">⟳ <b data-t="${t}" data-fmt="${short?'s':''}" data-chip="${kind||'x'}">${short?fmtShort(left):fmtLeft(left)}</b></span>`;
 }
 
 function routinePanel(type,rows,now,wide){
@@ -322,7 +336,7 @@ function routinePanel(type,rows,now,wide){
   const ends=[...new Set(rows.map(x=>x.o.end))];
   const showGame = state.filter==='all';
   const mixed = ends.length>1;
-  const when = !mixed ? `Resets in <b data-t="${ends[0]}" data-fmt="${ends[0]-now<D?'':'s'}">${ends[0]-now<D?fmtLeft(ends[0]-now):fmtShort(ends[0]-now)}</b>` : 'Resets at different times';
+  const when = !mixed ? `<span class="pwhen-l">Resets in</span> ${timeChip(ends[0],false,type)}` : `<span class="pwhen-l">Each quest has its own reset</span>`;
   const body = rows.length ? sorted.map(x=>rowHtml(x,showGame,mixed)).join('')
     : `<div class="panel-empty">No ${t.label.toLowerCase()} quests yet. <button class="linkbtn" data-action="newevent" data-type="${type}">+ Add one</button></div>`;
   return `<div class="panel ${wide?'wide':''}">
@@ -425,7 +439,9 @@ function tick(){
   document.querySelectorAll('[data-t]').forEach(el=>{
     const left=+el.dataset.t-now;
     if(left<=0){ crossed=true; return; }
+    if(el.dataset.fmt==='s' && left<D) el.dataset.fmt='';
     el.textContent = el.dataset.fmt==='s' ? fmtShort(left) : fmtLeft(left);
+    if(el.dataset.chip && !el.parentNode.classList.contains('gray')) el.parentNode.className='tchip '+chipUrgency(left,el.dataset.chip);
     if(el.classList.contains('cd')) el.className='cd '+urgency(left);
   });
   if(crossed) renderAll();
