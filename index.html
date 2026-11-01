@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Game Event Tracker</title>
+<title>Game Quest Tracker</title>
 <meta name="theme-color" content="#0f1117">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,8 +14,8 @@
 <div class="wrap">
   <header>
     <div>
-      <h1>Game <span>Event</span> Tracker</h1>
-      <div class="sub">Never miss a limited-time event again.</div>
+      <h1>Game <span>Quest</span> Tracker</h1>
+      <div class="sub">Never miss a limited-time quest again.</div>
     </div>
     <div class="head-right">
       <div class="sync"><span class="dot" id="syncDot"></span><span id="syncText">Loading…</span></div>
@@ -37,7 +37,7 @@
     <div class="card">
       <div class="big-emoji">🎮</div>
       <h2>Sign in to sync</h2>
-      <p>Your events are saved to your account and show up on every device you sign in on.</p>
+      <p>Your quests are saved to your account and show up on every device you sign in on.</p>
       <button class="btn" id="googleBtn">Sign in with Google</button>
       <div class="err" id="signErr"></div>
     </div>
@@ -47,7 +47,7 @@
     <div class="stats">
       <button class="stat red" data-quick="24h"><b id="sToday">0</b><small><span class="lg">Ending within </span>24h</small></button>
       <button class="stat amber" data-quick="3d"><b id="sWeek">0</b><small><span class="lg">Ending within </span>3 days</small></button>
-      <button class="stat" data-quick="open"><b id="sActive">0</b><small>To do</small></button>
+      <button class="stat" data-quick="open"><b id="sActive">0</b><small>Quests to do</small></button>
       <button class="stat green" data-quick="done"><b id="sDone">0</b><small>Done</small></button>
     </div>
 
@@ -55,37 +55,47 @@
       <div class="tabs" id="tabs"></div>
       <div class="top-actions">
         <button class="btn ghost secondary-cta" data-action="addgame">+ Add game</button>
-        <button class="btn primary-cta" id="newEventBtn">+ New event</button>
+        <button class="btn primary-cta" id="newEventBtn">+ New quest</button>
       </div>
     </div>
 
     <div id="resets"></div>
 
     <div class="list-head">
-      <div class="quick" id="quickInfo"></div>
+      <div class="cats" id="cats" role="tablist"></div>
+      <div class="quick" id="quickInfo" hidden></div>
       <span class="spacer"></span>
-      <label class="toggle"><input type="checkbox" id="showDone"> Show done & ended</label>
+      <label class="toggle" id="showDoneWrap"><input type="checkbox" id="showDone"> Show done & ended</label>
       <button class="chip" id="clearEnded" hidden>Clear ended</button>
     </div>
     <div class="list" id="list"></div>
   </main>
 </div>
 
-<button class="fab" id="fab" aria-label="New event" hidden>+</button>
+<button class="fab" id="fab" aria-label="New quest" hidden>+</button>
 
 <!-- Event editor -->
 <div class="modal" id="eventModal">
   <div class="card">
     <div class="modal-head">
-      <h2 id="formTitle">New event</h2>
+      <h2 id="formTitle">New quest</h2>
       <button class="icon-btn" type="button" data-close="eventModal" aria-label="Close">✕</button>
     </div>
     <form id="evForm" autocomplete="off">
       <label>Game</label>
       <select id="fGame"></select>
-      <label>Event name</label>
+      <label>Type</label>
+      <div class="seg type-seg" id="typeSeg">
+        <button type="button" data-type="limited" class="on">⏳ Limited-time</button>
+        <button type="button" data-type="daily">☀️ Daily</button>
+        <button type="button" data-type="weekly">📅 Weekly</button>
+      </div>
+      <div class="type-info" id="typeInfo" hidden></div>
+
+      <label>Quest name</label>
       <input id="fName" placeholder="e.g. Halloween Gacha Banner" maxlength="120">
 
+      <div id="limitedOnly">
       <label>When does it end?</label>
       <div class="seg" id="modeSeg">
         <button type="button" data-m="left" class="on">Time left</button>
@@ -110,9 +120,11 @@
         <button type="button" data-p="normal" class="on">Normal</button>
         <button type="button" data-p="low">Low</button>
       </div>
+      </div>
 
       <details id="moreOpts">
-        <summary>Repeat, progress & notes</summary>
+        <summary>Progress, notes & more</summary>
+        <div id="repeatBlock">
         <label>Repeats</label>
         <select id="fRepeat">
           <option value="0">Doesn't repeat</option>
@@ -129,6 +141,7 @@
           <input id="fRepeatDays" type="number" min="1" placeholder="e.g. 10">
         </div>
         <div class="hint">When it ends, the next round starts by itself and your progress resets.</div>
+        </div>
 
         <label>Goal counter</label>
         <input id="fGoal" type="number" min="0" inputmode="numeric" placeholder="e.g. 5 shop items, 30 stages">
@@ -143,7 +156,7 @@
       <div class="err" id="fErr"></div>
       <div class="row" style="margin-top:16px">
         <button class="btn ghost" type="button" data-close="eventModal">Cancel</button>
-        <button class="btn" type="submit" id="fSubmit">Add event</button>
+        <button class="btn" type="submit" id="fSubmit">Add quest</button>
       </div>
     </form>
   </div>
