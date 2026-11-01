@@ -258,3 +258,5 @@ summary{cursor:pointer;font-size:13px;color:var(--accent2)}
 
 .left-preview b{color:var(--text)}
 .snap{color:var(--green)}
+.rwhen{font-size:11px;color:var(--muted)}
+.rwhen b{font-family:'JetBrains Mono',monospace;font-weight:500;color:var(--text)}

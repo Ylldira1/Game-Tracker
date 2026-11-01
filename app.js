@@ -145,7 +145,8 @@ function prevMonthly(g,next){
 }
 function occ(e,now){
   if(e.type==='monthly'){
-    const g=resetCfg(state.games[e.game]), end=nextMonthly(g,now);
+    const g=resetCfg(state.games[e.game]); if(+e.monthDay) g.monthlyDay=+e.monthDay;
+    const end=nextMonthly(g,now);
     return { end, start: prevMonthly(g,end), ended:false };
   }
   if(e.type==='daily'||e.type==='weekly'){
@@ -301,13 +302,13 @@ function progressHtml(e,o){
 }
 
 /* Compact row for daily / weekly quests */
-function rowHtml(x,showGame){
+function rowHtml(x,showGame,showWhen){
   const e=x.e, o=x.o, g=state.games[e.game]||{name:'?',color:'#8b91a7'}, done=isDone(e,o);
   const extra=progressHtml(e,o)+(e.note?`<div class="note">${esc(e.note)}</div>`:'');
   return `<div class="qrow ${done?'done':''}" style="--c:${esc(g.color)}">
     <button class="chk sm ${done?'on':''}" data-toggle="${esc(e.id)}" title="${done?'Mark as not done':'Mark as done'}">${done?'✓':''}</button>
     <div class="body">
-      <div class="t"><span class="nm">${esc(e.name)}</span>${showGame?`<span class="gpill"><span class="sw"></span>${esc(g.name)}</span>`:''}</div>
+      <div class="t"><span class="nm">${esc(e.name)}</span>${showGame?`<span class="gpill"><span class="sw"></span>${esc(g.name)}</span>`:''}${showWhen&&!done?`<span class="rwhen">resets in <b data-t="${o.end}" data-fmt="${o.end-Date.now()<D?'':'s'}">${o.end-Date.now()<D?fmtLeft(o.end-Date.now()):fmtShort(o.end-Date.now())}</b></span>`:''}</div>
       ${extra}
     </div>
     <div class="acts"><button data-edit="${esc(e.id)}" title="Edit" aria-label="Edit">✎</button><button class="del" data-del="${esc(e.id)}" title="Delete" aria-label="Delete">🗑</button></div>
@@ -320,8 +321,9 @@ function routinePanel(type,rows,now,wide){
   const done=rows.filter(x=>isDone(x.e,x.o)).length;
   const ends=[...new Set(rows.map(x=>x.o.end))];
   const showGame = state.filter==='all';
-  const when = ends.length===1 ? `Resets in <b data-t="${ends[0]}" data-fmt="${ends[0]-now<D?'':'s'}">${ends[0]-now<D?fmtLeft(ends[0]-now):fmtShort(ends[0]-now)}</b>` : 'Resets per game';
-  const body = rows.length ? sorted.map(x=>rowHtml(x,showGame)).join('')
+  const mixed = ends.length>1;
+  const when = !mixed ? `Resets in <b data-t="${ends[0]}" data-fmt="${ends[0]-now<D?'':'s'}">${ends[0]-now<D?fmtLeft(ends[0]-now):fmtShort(ends[0]-now)}</b>` : 'Resets at different times';
+  const body = rows.length ? sorted.map(x=>rowHtml(x,showGame,mixed)).join('')
     : `<div class="panel-empty">No ${t.label.toLowerCase()} quests yet. <button class="linkbtn" data-action="newevent" data-type="${type}">+ Add one</button></div>`;
   return `<div class="panel ${wide?'wide':''}">
     <div class="panel-head">
@@ -449,7 +451,7 @@ const ordinal=n=>n+(['th','st','nd','rd'][(n%100>10&&n%100<14)?0:n%10]||'th');
 function setType(t){
   state.type=t;
   document.querySelectorAll('#typeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.type===t));
-  $('limitedOnly').hidden=t!=='limited'; $('repeatBlock').hidden=t!=='limited';
+  $('limitedOnly').hidden=t!=='limited'; $('repeatBlock').hidden=t!=='limited'; $('monthBlock').hidden=t!=='monthly';
   $('fName').placeholder=PLACEHOLDER[t];
   updateTypeInfo();
 }
@@ -458,7 +460,8 @@ function updateTypeInfo(){
   $('fServerTz').textContent=g?`(${fmtOffset(+g.offset||0)})`:'';
   const info=$('typeInfo');
   if(!g || state.type==='limited'){ info.hidden=true; return; }
-  const gg=resetCfg(g), now=Date.now(), hr=+gg.dailyHour, hh=`${hr%12||12}:00 ${hr<12?'AM':'PM'}`;
+  const gg=resetCfg(g); if(state.type==='monthly' && +$('fMonthDay').value) gg.monthlyDay=+$('fMonthDay').value;
+  const now=Date.now(), hr=+gg.dailyHour, hh=`${hr%12||12}:00 ${hr<12?'AM':'PM'}`;
   const nxt = state.type==='daily' ? nextDaily(gg,now) : state.type==='weekly' ? nextWeekly(gg,now) : nextMonthly(gg,now);
   const when = state.type==='daily' ? `every day at <b>${hh}</b>`
     : state.type==='weekly' ? `every <b>${DAYS[+gg.weeklyDay]}</b> at <b>${hh}</b>`
@@ -474,27 +477,29 @@ function setRepeatField(r){
 function resetForm(){
   state.editId=null;
   ['fName','fNote','fD','fH','fM','fEnd','fGoal','fChecklist','fRepeatDays'].forEach(id=>$(id).value='');
-  $('fServer').checked=false; setRepeatField(0); setPrio('normal'); setMode('left'); setType('limited'); updateLeftPreview();
+  $('fServer').checked=false; $('fMonthDay').value=''; setRepeatField(0); setPrio('normal'); setMode('left'); setType('limited'); updateLeftPreview();
   $('fErr').textContent=''; $('formTitle').textContent='New quest'; $('fSubmit').textContent='Add quest';
   $('moreOpts').open=false;
 }
 function newEvent(type){
   if(!gamesSorted().length){ toast('Add a game first.'); return openGame(null); }
-  resetForm();
+  fillMonthDay(); resetForm();
   const pick = state.filter!=='all' ? state.filter : state.lastGame;
   if(pick && state.games[pick]) $('fGame').value=pick;
+  fillMonthDay();
   setType(TYPES[type]?type:(state.cat!=='all'?state.cat:'limited'));
   openModal('eventModal'); setTimeout(()=>{ if(!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) $('fName').focus(); },50);
 }
 function startEdit(id){
   const e=state.events[id]; if(!e) return;
-  resetForm();
+  fillMonthDay(); resetForm();
   const o=occ(e,Date.now());
   state.editId=id;
-  $('fGame').value=e.game; $('fName').value=e.name; $('fNote').value=e.note||'';
+  $('fGame').value=e.game; fillMonthDay(); $('fName').value=e.name; $('fNote').value=e.note||'';
   $('fGoal').value=+e.goal||''; $('fChecklist').value=(e.checklist||[]).join('\n');
   setRepeatField(+e.repeat||0); setPrio(e.prio||'normal');
   setMode('date'); $('fEnd').value=toLocalInput(o.end);
+  $('fMonthDay').value=+e.monthDay?String(e.monthDay):'';
   setType(typeOf(e));
   $('moreOpts').open = !!(+e.repeat||+e.goal||(e.checklist||[]).length||e.note);
   $('formTitle').textContent='Edit quest'; $('fSubmit').textContent='Save changes';
@@ -504,7 +509,14 @@ function startEdit(id){
 $('modeSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) setMode(b.dataset.m); });
 $('prioSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) setPrio(b.dataset.p); });
 $('typeSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) setType(b.dataset.type); });
-$('fGame').addEventListener('change',()=>{ updateTypeInfo(); updateLeftPreview(); });
+$('fGame').addEventListener('change',()=>{ updateTypeInfo(); updateLeftPreview(); fillMonthDay(); });
+$('fMonthDay').addEventListener('change',updateTypeInfo);
+function fillMonthDay(){
+  const sel=$('fMonthDay'), cur=sel.value, g=state.games[$('fGame').value];
+  let h=`<option value="">Game default (${ordinal(resetCfg(g).monthlyDay)})</option>`;
+  for(let i=1;i<=31;i++) h+=`<option value="${i}">${ordinal(i)} of the month</option>`;
+  sel.innerHTML=h; sel.value=cur;
+}
 function updateLeftPreview(){
   const ms=(((+$('fD').value||0)*24+(+$('fH').value||0))*60+(+$('fM').value||0))*60000, el=$('leftPreview');
   if(ms<=0){ el.innerHTML='Copy the countdown the game shows you.'; return; }
@@ -541,6 +553,7 @@ $('evForm').addEventListener('submit',async ev=>{
     if($('fRepeat').value==='custom' && repeat<1) return err('Enter how many days between repeats.');
   }else{
     const gg=resetCfg(state.games[game]);
+    if(type==='monthly' && +$('fMonthDay').value) gg.monthlyDay=+$('fMonthDay').value;
     end = type==='daily' ? nextDaily(gg,Date.now()) : type==='weekly' ? nextWeekly(gg,Date.now()) : nextMonthly(gg,Date.now());
   }
   const goal=Math.max(0,Math.round(+$('fGoal').value||0));
@@ -550,6 +563,7 @@ $('evForm').addEventListener('submit',async ev=>{
   const e={
     ...(old||{}), id:old?old.id:'ev_'+uid(), type, game, name, end, repeat, goal, checklist,
     prio: type==='limited'?state.prio:'normal', note:$('fNote').value.trim(),
+    monthDay: type==='monthly' ? (+$('fMonthDay').value||null) : null,
     created: old && old.created < end ? old.created : Date.now(),
   };
   if(old && JSON.stringify(old.checklist||[])!==JSON.stringify(checklist)) e.checks=[];
