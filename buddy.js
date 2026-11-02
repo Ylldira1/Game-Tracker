@@ -7,7 +7,7 @@
   const getPref = () => { try { const v = localStorage.getItem(KEY); return v === null ? null : JSON.parse(v); } catch (e) { return null; } };
   const setPref = v => { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (e) {} };
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let on = getPref() ?? (!reduced && innerWidth >= 600);
+  let on = getPref() ?? (innerWidth >= 600);
 
   /* ---------- sprite ---------- */
   const S = 2, W = 22, H = 21;              // 22x21 pixel grid, drawn at 2x
