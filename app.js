@@ -497,9 +497,15 @@ function privTag(e){
   const g=state.games[e.game];
   return isAdmin && e.private && g && g.shared ? '<span class="tag priv" title="Not shared with followers">🔒 Only me</span>' : '';
 }
+// Simple line icons (inherit the button's colour)
+const ICON={
+  edit:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>',
+  hide:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10 10 0 0 1 12 20C5 20 1 12 1 12a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9 9 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M1 1l22 22"/></svg>',
+};
 function actsHtml(e){
-  if(!canEdit(e)) return `<div class="acts"><button class="del" data-del="${esc(e.id)}" title="Hide for me" aria-label="Hide for me">🙈</button></div>`;
-  return `<div class="acts"><button data-edit="${esc(e.id)}" title="Edit" aria-label="Edit">✎</button><button class="del" data-del="${esc(e.id)}" title="Delete" aria-label="Delete">🗑</button></div>`;
+  if(!canEdit(e)) return `<div class="acts"><button class="hide" data-del="${esc(e.id)}" title="Hide for me" aria-label="Hide for me">${ICON.hide}</button></div>`;
+  return `<div class="acts"><button class="edit" data-edit="${esc(e.id)}" title="Edit" aria-label="Edit">${ICON.edit}</button><button class="del" data-del="${esc(e.id)}" title="Delete" aria-label="Delete">${ICON.trash}</button></div>`;
 }
 // Readable countdown chip, coloured by how soon it is
 // Daily timers are always under 24h, so they only warn in the last few hours

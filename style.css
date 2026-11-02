@@ -213,9 +213,13 @@ body:has(#signin:not([hidden])) .sidebar{display:none}
 .cd.red{color:var(--red)} .cd.amber{color:var(--amber)} .cd.green{color:var(--green)} .cd.gray{color:var(--muted)}
 .acts{display:flex;gap:4px}
 
-.acts button{background:var(--panel2);border:1px solid var(--line2);color:var(--text);border-radius:7px;width:28px;height:26px;padding:0;font-size:13px;cursor:pointer;display:grid;place-items:center}
-.acts button:hover{color:var(--text);border-color:var(--accent)}
-.acts button.del:hover{border-color:var(--red);color:var(--red)}
+.acts button{border-radius:8px;width:30px;height:28px;padding:0;cursor:pointer;display:grid;place-items:center;transition:all .15s}
+.acts button.edit{color:#c4b5ff;background:rgba(124,92,255,.16);border:1px solid rgba(124,92,255,.45)}
+.acts button.edit:hover{color:#fff;background:var(--accent);border-color:var(--accent)}
+.acts button.del{color:#ff8f9a;background:rgba(255,93,108,.12);border:1px solid rgba(255,93,108,.45)}
+.acts button.del:hover{color:#fff;background:var(--red);border-color:var(--red)}
+.acts button.hide{color:var(--text);background:var(--panel2);border:1px solid var(--ctl)}
+.acts button.hide:hover{border-color:var(--accent)}
 .tag{font-size:10px;font-weight:600;padding:2px 7px;border-radius:5px;text-transform:uppercase;letter-spacing:.04em}
 .tag.must{background:rgba(255,93,108,.15);color:var(--red)}
 .tag.low{background:var(--panel2);color:var(--muted)}
