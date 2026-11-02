@@ -453,14 +453,13 @@ body{
 .tbar{height:3px;background:linear-gradient(90deg,var(--c),#fff);box-shadow:0 0 10px var(--c);opacity:.75}
 
 /* Quest cards */
-.ev::before{width:4px;box-shadow:0 0 14px var(--c)}
+.ev::before{width:4px;box-shadow:none}
 .ev:hover{transform:translateY(-1px);box-shadow:0 10px 28px rgba(0,0,0,.35),0 0 0 1px rgba(124,92,255,.25)}
 .ev{transition:transform .15s,box-shadow .15s}
 .ev .t{font-size:16px}
 /* Rarity: Must-do = legendary gold */
-.ev.rar-must{background:linear-gradient(100deg,rgba(255,207,90,.045),rgba(21,24,38,.88) 20%) padding-box,
-  linear-gradient(140deg,rgba(255,207,90,.75),rgba(255,207,90,.06) 35%,rgba(255,255,255,.04) 70%,rgba(255,207,90,.3)) border-box;box-shadow:0 0 22px -8px rgba(255,207,90,.35)}
-.ev.rar-must::before{background:linear-gradient(var(--gold),#ff9a3c);box-shadow:0 0 8px rgba(255,207,90,.6)}
+.ev.rar-must{background:linear-gradient(var(--panel),var(--panel)) padding-box,linear-gradient(140deg,rgba(255,207,90,.8),rgba(255,207,90,.08) 35%,rgba(255,255,255,.04) 70%,rgba(255,207,90,.3)) border-box;box-shadow:0 0 20px -10px rgba(255,207,90,.4)}
+.ev.rar-must::before{background:linear-gradient(var(--gold),#ff9a3c);box-shadow:none}
 .ev.rar-low{opacity:.85}
 .tag{font-size:10.5px;letter-spacing:.08em}
 .tag.must{background:linear-gradient(90deg,rgba(255,207,90,.25),rgba(255,154,60,.2));color:var(--gold);border:1px solid rgba(255,207,90,.5);text-shadow:0 0 8px rgba(255,207,90,.5)}
