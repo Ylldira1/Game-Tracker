@@ -25,7 +25,7 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 const clean = o => JSON.parse(JSON.stringify(o));
 
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.style.display='block'; clearTimeout(toast._t); toast._t=setTimeout(()=>t.style.display='none',2600); }
-function setSync(cls,text){ $('syncDot').className='dot '+cls; $('syncText').textContent=text; }
+function setSync(cls,text){ $('syncDot').className='dot '+cls; $('syncDot2').className='dot sdot '+cls; $('syncText').textContent=text; $('menuBtn').title='Account · '+text; }
 
 /* ---------------- Storage: browser only ---------------- */
 function localStore(){
@@ -186,14 +186,14 @@ async function firebaseStore(){
     Object.keys(parts).forEach(k=>delete parts[k]);
     if(!u){
       state.games={}; state.events={};
-      $('app').hidden=true; $('fab').hidden=true; $('signin').hidden=false; $('userBox').innerHTML='';
+      $('app').hidden=true; $('fab').hidden=true; $('signin').hidden=false; $('userBox').innerHTML=''; $('acctAvatar').innerHTML='<span class="avatar plain">⋯</span>';
       $('signOutBtn').hidden=true; $('signOutSep').hidden=true; $('nameBtn').hidden=true;
       setSync('','Signed out');
       return;
     }
     isAdmin=(u.email||'').toLowerCase()===ADMIN_EMAIL; sharingOn=true;
     $('signin').hidden=true; $('app').hidden=false; $('fab').hidden=false;
-    state.googleName=u.displayName||u.email||''; state.displayName=''; state.photo=u.photoURL||''; state.photoCustom='';
+    state.googleName=u.displayName||u.email||''; state.email=u.email||''; state.displayName=''; state.photo=u.photoURL||''; state.photoCustom='';
     renderUser();
     $('signOutBtn').hidden=false; $('signOutSep').hidden=false; $('nameBtn').hidden=false;
     $('signOutBtn').onclick=()=>{ closeMenu(); signOut(auth); };
@@ -1010,8 +1010,9 @@ function avatarHtml(spec,name,cls=''){
   return `<span class="avatar ${cls}">${esc((name||'?').charAt(0).toUpperCase())}</span>`;
 }
 function renderUser(){
-  const nm=state.displayName||state.googleName||'';
-  $('userBox').innerHTML=`${avatarHtml(state.photoCustom||state.photo,nm)}<span>${esc(nm)}</span>${isAdmin?'<span class="admin-badge" title="Super Admin: you can share games with others">Admin</span>':''}`;
+  const nm=state.displayName||state.googleName||'', pic=state.photoCustom||state.photo;
+  $('acctAvatar').innerHTML=avatarHtml(pic,nm);
+  $('userBox').innerHTML=`${avatarHtml(pic,nm)}<div class="mh-text"><b>${esc(nm)}</b>${state.email?`<small>${esc(state.email)}</small>`:''}</div>${isAdmin?'<span class="admin-badge" title="Super Admin: you can share games with others">Admin</span>':''}`;
 }
 function pfRender(){
   const d=state.pfDraft, nm=$('nName').value.trim()||state.googleName;
