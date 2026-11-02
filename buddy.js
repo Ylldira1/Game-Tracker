@@ -50,91 +50,13 @@
     else if (o.eyes !== 'closed') put(cx + 1.5, ey + 3, 'K');
   }
 
-  // Kuro: cat-eared girl, long dark hair, big round glasses
-  function drawKuro(put, o, W, H) {
-    const cx = 12, R = W - 1;
-    const by = (o.sit ? 3 : 0) + (o.bob || 0) + (o.tuck ? -1 : 0);
-    const layer = fn => {
-      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-        const c = fn(x, y); if (!c) continue;
-        const edge = !fn(x + 1, y) || !fn(x - 1, y) || !fn(x, y + 1) || !fn(x, y - 1);
-        put(x, y, edge ? 'K' : c);
-      }
-    };
-    const fl = o.flap || 0;
-    // long hair (behind)
-    layer((x, y) => {
-      const yy = y - by; if (yy < 5 || yy > 31) return null;
-      const xs = yy > 18 ? x - fl : x, dx = Math.abs(xs + .5 - cx);
-      const hw = yy < 19 ? 9 : 9 + (yy - 19) * 0.3;
-      const bottom = 27 + ((xs * 5 + 7) % 3) - (o.sit ? 1 : 0);
-      if (dx > hw || yy > bottom) return null;
-      return (xs % 4 === 1 && yy > 14) ? 'H2' : 'H';
-    });
-    // legs
-    if (!o.sit) {
-      const f = o.feet || 0, top = 26 + by, bot = o.tuck ? 28 + by : H - 1;
-      for (let y = top; y <= bot; y++) {
-        if (!(f > 0 && y === bot)) { put(9 + f, y, 'O2'); put(10 + f, y, 'O2'); }
-        if (!(f < 0 && y === bot)) { put(13 - f, y, 'O2'); put(14 - f, y, 'O2'); }
-      }
-    }
-    // body / dress
-    layer((x, y) => {
-      const yy = y - by; if (yy < 20 || yy > 27) return null;
-      const hw = yy < 21 ? 3.4 : 3.8 + (yy - 21) * 0.25;
-      return Math.abs(x + .5 - cx) <= hw ? 'O' : null;
-    });
-    put(11, 22 + by, 'W'); put(12, 22 + by, 'W'); put(11, 23 + by, 'W');
-    // cat ears
-    const ear = (x, y) => {
-      const yy = y - by; if (yy < 0 || yy > 7) return null;
-      const xl = 5 - yy * 0.3, xr = 5 + yy * 0.8;
-      if (x < xl || x > xr) return null;
-      return (x > xl + 1 && x < xr - 1.2 && yy > 2) ? 'E' : 'H';
-    };
-    layer(ear); layer((x, y) => ear(R - x, y));
-    // head
-    const head = (x, y) => (((x + .5 - cx) / 7.6) ** 2 + ((y + .5 - (13 + by)) / 7.5) ** 2) <= 1;
-    layer((x, y) => head(x, y) ? (y - by > 19 ? 'S2' : 'S') : null);
-    // hair on top + bangs + side locks
-    layer((x, y) => {
-      const yy = y - by;
-      if (head(x, y) && yy <= 8) return 'H';
-      if (yy >= 9 && yy <= 25 && (x === 4 || x === 5 || x === R - 4 || x === R - 5) && !(yy > 22 && (x === 5 || x === R - 5))) return 'H';
-      return null;
-    });
-    // bangs (solid, no inner outlines)
-    for (let x = 5; x <= R - 5; x++) {
-      const len = [1, 2, 1, 3, 2, 1, 2, 3, 1, 2, 1, 2, 3, 1][(x - 5) % 14];
-      for (let k = 0; k < len; k++) put(x, 9 + k + by, k === len - 1 ? 'H2' : 'H');
-    }
-    put(11, 12 + by, 'H'); put(12, 12 + by, 'H'); put(12, 13 + by, 'H');
-    // big round glasses
-    for (const gx of [cx - 3.4, cx + 3.4]) {
-      const gy = 14.5 + by;
-      for (let y = Math.floor(gy - 4); y <= gy + 4; y++) for (let x = Math.floor(gx - 4); x <= gx + 4; x++) {
-        const d = Math.hypot(x + .5 - gx, y + .5 - gy);
-        if (d >= 2.35 && d <= 3.2) put(x, y, 'K');
-        else if (d < 2.35) put(x, y, 'S');
-      }
-      const ex = Math.floor(gx), ey = Math.floor(gy);
-      if (o.eyes === 'closed') { put(ex - 1, ey, 'K'); put(ex, ey, 'K'); put(ex + 1, ey, 'K'); }
-      else if (o.eyes === 'happy') { put(ex - 1, ey + 1, 'K'); put(ex, ey, 'K'); put(ex + 1, ey + 1, 'K'); }
-      else if (o.eyes === 'wide') { put(ex, ey, 'K'); put(ex, ey - 1, 'K'); }
-      else { put(ex + 1, ey - 1, 'W'); put(ex - 1, ey + 1, 'L'); }                 // lens glints
-    }
-    put(11, 19 + by, 'K'); put(12, 19 + by, 'K'); if (o.eyes === 'happy' || o.eyes === 'wide') { put(11, 20 + by, 'K'); put(12, 20 + by, 'K'); }
-    put(5, 18 + by, 'P'); put(R - 5, 18 + by, 'P');
-  }
-
   const KINDS = {
     mochi: { name: 'Mochi', icon: '🐾', pref: 'get.buddy', W: 22, H: 21, draw: drawMochi, glow: 'rgba(167,139,250,.35)',
       pal: { K: '#1a1030', B: '#a78bfa', D: '#7c5ce0', L: '#e4dcff', C: '#22d3ee', C2: '#0e9fb3', P: '#ff7eb6', G: '#5ee6a0', G2: '#2fb877', W: '#ffffff' },
       hello: "Hi! I'm Mochi ✦", lines: ['Hehe, that tickles!', 'Pull luck +1 ✦', 'I believe in your 50/50!'] },
-    kuro: { name: 'Kuro', icon: '🐱', pref: 'get.buddy2', W: 24, H: 32, draw: drawKuro, glow: 'rgba(255,190,120,.25)',
-      pal: { K: '#0d0705', H: '#3d2821', H2: '#5f4135', E: '#b57d52', S: '#e4b079', S2: '#c99158', O: '#36251f', O2: '#22160f', P: '#ec8b7c', W: '#ffffff', L: '#f6dcb8' },
-      hello: 'Nya~ I\'m Kuro.', lines: ['Nya!', '…don\'t poke my ears.', 'Five more minutes of sleep?', 'Your quests won\'t do themselves~'] },
+    pika: { name: 'Pikachu', icon: '⚡', pref: 'get.buddy3', sheet: 'pika', scale: 2, glow: 'rgba(255,220,60,.35)',
+      hello: 'Pika pika! ⚡', held: 'Pikaaa?! ⚡', lines: ['Pika?', 'Pikaaa~ ⚡', 'Chu! Do your quests!', 'Pika pi! ✦'],
+      clicks: ['Pose', 'Shock', 'Charge', 'Nod'], extras: ['LookUp', 'Eat', 'DeepBreath', 'Rotate', 'Nod', 'Sit'] },
   };
 
   /* ---------- shared world ---------- */
@@ -162,7 +84,11 @@
 
   /* ---------- one buddy ---------- */
   function makeBuddy(kind) {
-    const K = KINDS[kind], W = K.W, H = K.H;
+    const K = KINDS[kind];
+    const SH = K.sheet ? (window.BUDDY_SHEETS || {})[K.sheet] : null;
+    if (K.sheet && !SH) return null;                       // sprite data file not loaded
+    const W = K.W || 24, H = K.H || 30, SC = K.scale || S;
+    let img = null; if (SH) { img = new Image(); img.src = SH.img; }
     const cv = document.createElement('canvas');
     cv.width = W * S; cv.height = H * S; cv.className = 'buddy'; cv.setAttribute('aria-hidden', 'true');
     cv.style.setProperty('--glow', K.glow);
@@ -170,6 +96,40 @@
     const say = document.createElement('div'); say.className = 'buddy-say';
     const b = { x: 200, y: -40, vx: 0, vy: 0, face: 1, st: 'fall', sup: null, until: 0, tx: 0, land: 0, blink: 0, happyUntil: 0 };
     let lastZ = 0, down = null, sayT = 0, on = false;
+    b.ht = H * S;
+
+    /* sprite-sheet animation (PMD-style packs) */
+    const animLen = n => SH.anims[n].d.reduce((a, c) => a + c, 0) * 1000 / 60;
+    function frameOf(n, dir, ms, loop) {
+      const A = SH.anims[n], total = animLen(n), tt = loop ? ms % total : Math.min(ms, total - 1);
+      let acc = 0;
+      for (let i = 0; i < A.d.length; i++) { acc += A.d[i] * 1000 / 60; if (tt < acc) return A.dirs[dir][i]; }
+      return A.dirs[dir][A.d.length - 1];
+    }
+    function playOnce(n) {
+      if (!SH || !SH.anims[n]) return 0;
+      const now = performance.now(); b.once = { n, t0: now, end: now + animLen(n) };
+      return animLen(n);
+    }
+    function sheetFrame(t) {
+      const right = b.face > 0, side = right ? 'r' : 'l', diag = right ? 'dr' : 'dl';
+      if (b.once && t >= b.once.end) b.once = null;
+      if (b.once && b.st !== 'held' && b.st !== 'fall' && b.st !== 'walk') return frameOf(b.once.n, diag, t - b.once.t0, false);
+      if (b.st === 'walk') return frameOf('Walk', side, t, true);
+      if (b.st === 'fall') { const A = SH.anims.Hop.dirs[side]; return A[Math.min(b.vy < -3 ? 3 : b.vy < 2 ? 5 : 7, A.length - 1)]; }
+      if (b.st === 'held') return frameOf('Pull', diag, t, true);
+      if (b.st === 'sleep') return frameOf('Sleep', 'dr', t, true);
+      if (b.sitUntil > t) return frameOf('Sit', diag, t - b.sitT0, false);
+      return frameOf('Idle', diag, t, true);
+    }
+    function drawSheet(t) {
+      const [sx, sy, w, h, ax, ay] = SH.frames[sheetFrame(t)];
+      const cw = w * SC, ch = h * SC;
+      if (cv.width !== cw || cv.height !== ch) { cv.width = cw; cv.height = ch; } else ctx.clearRect(0, 0, cw, ch);
+      ctx.imageSmoothingEnabled = false;
+      if (img.complete) ctx.drawImage(img, sx, sy, w, h, 0, 0, cw, ch);
+      return [ax * SC, ay * SC];
+    }
 
     function render(o) {
       ctx.clearRect(0, 0, cv.width, cv.height);
@@ -184,6 +144,12 @@
     }
     const setState = (st, ms) => { b.st = st; b.until = performance.now() + (ms || 0); };
     const standOn = p => { b.sup = p ? p.el : null; b.vx = 0; b.vy = 0; b.land = performance.now(); setState('idle', 600 + Math.random() * 1800); };
+    function afterLand(hard) {
+      if (!SH) return;
+      if (hard) { const ms = playOnce('HitGround'); setState('idle', ms + 400); bubble(pick(['Pika…!', 'Ow ow…']), 1400); }
+      else if (b.poseOnLand) { const ms = playOnce('Pose'); setState('idle', ms + 500); }
+      b.poseOnLand = false;
+    }
     function respawn() {
       scan(); const p = pick(plats);
       b.x = p ? p.l + Math.random() * (p.r - p.l) : innerWidth / 2;
@@ -210,6 +176,12 @@
       const r = supRect(); if (!r) return;
       if (Date.now() - lastAct > 40000 && !r.floor) { setState('sleep'); bubble('Zzz…', 1600); return; }
       const roll = Math.random();
+      if (SH && !r.floor && Math.random() < 0.3) {
+        const n = pick(K.extras), now = performance.now();
+        if (n === 'Sit') { b.sitT0 = now; b.sitUntil = now + 3000 + Math.random() * 4000; setState('idle', b.sitUntil - now); }
+        else setState('idle', playOnce(n) + 500);
+        return;
+      }
       if ((r.floor || roll < 0.42) && jumpSomewhere()) return;
       if (roll < 0.8) {
         b.tx = r.l + Math.random() * (r.r - r.l);
@@ -219,21 +191,21 @@
     }
     function fx(ch, cls) {
       const s = document.createElement('span'); s.className = 'buddy-fx ' + (cls || ''); s.textContent = ch;
-      s.style.left = (b.x - 6 + (Math.random() - .5) * 26) + 'px'; s.style.top = (b.y - H * S - 6) + 'px';
+      s.style.left = (b.x - 6 + (Math.random() - .5) * 26) + 'px'; s.style.top = (b.y - b.ht - 6) + 'px';
       document.body.appendChild(s); setTimeout(() => s.remove(), 1400);
     }
     function bubble(text, ms) { say.textContent = text; say.classList.add('show'); clearTimeout(sayT); sayT = setTimeout(() => say.classList.remove('show'), ms || 2600); }
     function celebrate(text) {
       if (!on || b.st === 'held') return;
       if (supRect()) { b.vy = -7.5; b.vx = 0; b.sup = null; setState('fall'); }
-      b.happyUntil = performance.now() + 1400;
+      b.happyUntil = performance.now() + 1400; b.poseOnLand = true; b.sitUntil = 0;
       for (let i = 0; i < 4; i++) setTimeout(() => fx(i % 2 ? '✦' : '♥', i % 2 ? 'spark' : 'heart'), i * 120);
       if (text) bubble(text);
     }
-    function wake() { lastAct = Date.now(); setState('idle', 900); b.happyUntil = performance.now() + 900; fx('!', 'spark'); bubble(pick(["Huh? I'm up!", 'Five more minutes…', 'Oh! Hi there!']), 1800); }
+    function wake() { lastAct = Date.now(); setState('idle', SH ? playOnce('Wake') + 300 : 900); b.happyUntil = performance.now() + 900; fx('!', 'spark'); bubble(pick(["Huh? I'm up!", 'Five more minutes…', 'Oh! Hi there!']), 1800); }
 
     function update(t, dt) {
-      if (b.st === 'held') { b.x = mx; b.y = my + H * S * 0.7; }
+      if (b.st === 'held') { b.x = mx; b.y = my + b.ht * 0.6; }
       else if (b.st === 'fall') {
         b.vy += G * dt;
         const nx = b.x + b.vx * dt, ny = b.y + b.vy * dt;
@@ -241,8 +213,9 @@
         if (b.vy > 0) for (const p of plats) if (nx >= p.l && nx <= p.r && b.y <= p.t + 1 && ny >= p.t && (!landed || p.t < landed.t)) landed = p;
         b.x = nx; b.y = ny;
         if (b.x < 16 || b.x > innerWidth - 16) { b.x = Math.max(16, Math.min(innerWidth - 16, b.x)); b.vx *= -0.5; }
-        if (landed) { b.y = landed.t; standOn(landed); }
-        else if (b.y >= innerHeight - 2) { b.y = innerHeight - 2; standOn(null); }
+        const hard = b.vy > 11;
+        if (landed) { b.y = landed.t; standOn(landed); afterLand(hard); }
+        else if (b.y >= innerHeight - 2) { b.y = innerHeight - 2; standOn(null); afterLand(hard); }
       } else {
         let r = supRect();
         if (!r) {
@@ -275,9 +248,15 @@
         if (t > b.blink) { if (t > b.blink + 130) b.blink = t + 2200 + Math.random() * 2600; else o.eyes = 'closed'; }
       }
       if (happy && b.st !== 'sleep') o.eyes = 'happy';
-      render(o);
-      cv.style.transform = `translate(${Math.round(b.x - W * S / 2)}px,${Math.round(b.y - H * S + 2)}px)`;
-      say.style.transform = `translate(${Math.round(Math.max(8, Math.min(innerWidth - 190, b.x - 90)))}px,${Math.round(b.y - H * S - 34)}px)`;
+      if (SH) {
+        const [ax, ay] = drawSheet(t);
+        b.ht = ay;
+        cv.style.transform = `translate(${Math.round(b.x - ax)}px,${Math.round(b.y - ay)}px)`;
+      } else {
+        render(o); b.ht = H * S - 2;
+        cv.style.transform = `translate(${Math.round(b.x - W * S / 2)}px,${Math.round(b.y - H * S + 2)}px)`;
+      }
+      say.style.transform = `translate(${Math.round(Math.max(8, Math.min(innerWidth - 190, b.x - 90)))}px,${Math.round(b.y - b.ht - 34)}px)`;
     }
 
     cv.addEventListener('pointerdown', e => {
@@ -288,7 +267,7 @@
     cv.addEventListener('pointermove', e => {
       if (!down) return;
       if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6 && b.st !== 'held') {
-        setState('held'); b.sup = null; document.body.classList.add('buddy-drag'); getSelection().removeAllRanges(); bubble(kind === 'kuro' ? 'Nya?! Put me down!' : 'Wheee!', 1200);
+        setState('held'); b.sup = null; document.body.classList.add('buddy-drag'); getSelection().removeAllRanges(); bubble(K.held || 'Wheee!', 1200);
       }
       down.vx = (e.clientX - down.px) * 0.6; down.vy = (e.clientY - down.py) * 0.6; down.px = e.clientX; down.py = e.clientY;
     });
@@ -297,6 +276,12 @@
       document.body.classList.remove('buddy-drag');
       if (b.st === 'held') { b.vx = Math.max(-16, Math.min(16, down.vx)); b.vy = Math.max(-16, Math.min(16, down.vy)); setState('fall'); }
       else if (b.st === 'sleep') wake();
+      else if (SH) {
+        lastAct = Date.now(); b.sitUntil = 0;
+        setState('idle', playOnce(pick(K.clicks)) + 400);
+        for (let i = 0; i < 3; i++) setTimeout(() => fx(i % 2 ? '✦' : '⚡', 'spark'), i * 120);
+        bubble(Math.random() < .5 ? hint() : pick(K.lines));
+      }
       else celebrate(Math.random() < .5 ? hint() : pick(K.lines));
       down = null;
     });
@@ -310,7 +295,7 @@
   }
 
   /* ---------- loop, input, menu ---------- */
-  const buddies = Object.keys(KINDS).map(makeBuddy);
+  const buddies = Object.keys(KINDS).map(makeBuddy).filter(Boolean);
   let raf = 0, lastT = 0;
   function loop(t) {
     const live = buddies.filter(x => x.on);
