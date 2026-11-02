@@ -396,3 +396,131 @@ fieldset:disabled{opacity:.6}
 .mh-text b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mh-text small{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .menu-sync{padding:2px 10px 8px}
+
+/* =========================================================
+   GAMING THEME
+   ========================================================= */
+:root{
+  --game:'Chakra Petch',Inter,system-ui,sans-serif;
+  --cyan:#3ee6ff; --gold:#ffcf5a; --pink:#ff5d8f;
+  --bg:#080a12; --side:rgba(13,15,26,.92); --panel:rgba(21,24,38,.78); --panel2:#1b2033;
+}
+/* Space backdrop: soft nebula glows + faint grid */
+body{
+  background:
+    radial-gradient(900px 600px at 12% -10%, rgba(124,92,255,.22), transparent 60%),
+    radial-gradient(800px 600px at 105% 110%, rgba(62,230,255,.12), transparent 60%),
+    radial-gradient(600px 400px at 70% 20%, rgba(255,93,143,.07), transparent 60%),
+    linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px) 0 0/44px 44px,
+    linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px) 0 0/44px 44px,
+    var(--bg);
+  background-attachment:fixed;
+}
+/* Game font for headings, numbers and labels */
+.topbar h1,.ptitle,.section,.cats button,.stat b,.cd,.tchip b,.btn,.sb-brand b,.sb-head,.stat small,.signin h2,.empty h3,.card h2,.tag,.stamp,.ring-in{font-family:var(--game)}
+.topbar h1{font-size:30px;font-weight:700;letter-spacing:.01em;background:linear-gradient(90deg,#fff 30%,#c9bdff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.topbar h1 .shared-ic{-webkit-text-fill-color:initial}
+.section{font-size:12.5px;letter-spacing:.14em;color:#b8b0ff}
+.section::before{content:"◆ ";color:var(--accent)}
+.sub{font-family:var(--game);letter-spacing:.06em;text-transform:uppercase;font-size:11.5px;color:var(--muted)}
+.topbar .sub{font-family:Inter,system-ui,sans-serif;text-transform:none;letter-spacing:0;font-size:13.5px}
+
+/* Sidebar */
+.sidebar{backdrop-filter:blur(10px);border-right:1px solid rgba(124,92,255,.18)}
+.sb-brand .logo{box-shadow:0 0 18px rgba(124,92,255,.55)}
+.sb-brand b{font-size:16px;letter-spacing:.02em}
+.sb-item .sw{box-shadow:0 0 8px var(--c)}
+.sb-item.on{background:linear-gradient(90deg,rgba(124,92,255,.28),rgba(124,92,255,.04))}
+.sb-item.on::before{box-shadow:0 0 10px var(--c,var(--accent))}
+
+/* Panels & cards: glass + glowing edge */
+.panel,.ev,.card{backdrop-filter:blur(8px);
+  background:linear-gradient(var(--panel),var(--panel)) padding-box,
+             linear-gradient(140deg,rgba(124,92,255,.45),rgba(255,255,255,.05) 35%,rgba(255,255,255,.04) 70%,rgba(62,230,255,.25)) border-box;
+  border:1px solid transparent}
+.modal .card{background:linear-gradient(#141828,#141828) padding-box,linear-gradient(140deg,rgba(124,92,255,.6),rgba(255,255,255,.06) 40%,rgba(62,230,255,.3)) border-box}
+.panel{position:relative;overflow:hidden}
+.panel::after{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,transparent,var(--pc,var(--accent)),transparent);opacity:.8}
+.p-daily{--pc:#ffb547}.p-weekly{--pc:#3ee6ff}.p-monthly{--pc:#c77dff}
+.ptitle{font-size:17px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+.panel.clear{background:linear-gradient(rgba(21,32,30,.8),rgba(21,32,30,.8)) padding-box,linear-gradient(140deg,rgba(62,207,142,.7),rgba(255,255,255,.05) 40%,rgba(62,207,142,.3)) border-box}
+.stamp{position:absolute;right:14px;bottom:10px;font-size:13px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--green);border:2px solid var(--green);padding:3px 10px;border-radius:6px;transform:rotate(-6deg);opacity:.85;text-shadow:0 0 10px rgba(62,207,142,.6);box-shadow:0 0 14px rgba(62,207,142,.25) inset;pointer-events:none}
+
+/* Progress bars with glow */
+.pbar{background:rgba(255,255,255,.06)}
+.pbar i{background:linear-gradient(90deg,#3ecf8e,#3ee6ff);box-shadow:0 0 10px rgba(62,230,255,.6)}
+.pbar.wide{height:5px;border-radius:5px}
+.tbar{height:3px;background:linear-gradient(90deg,var(--c),#fff);box-shadow:0 0 10px var(--c);opacity:.75}
+
+/* Quest cards */
+.ev::before{width:4px;box-shadow:0 0 14px var(--c)}
+.ev:hover{transform:translateY(-1px);box-shadow:0 10px 28px rgba(0,0,0,.35),0 0 0 1px rgba(124,92,255,.25)}
+.ev{transition:transform .15s,box-shadow .15s}
+.ev .t{font-size:16px}
+/* Rarity: Must-do = legendary gold */
+.ev.rar-must{background:linear-gradient(100deg,rgba(255,207,90,.045),rgba(21,24,38,.88) 20%) padding-box,
+  linear-gradient(140deg,rgba(255,207,90,.75),rgba(255,207,90,.06) 35%,rgba(255,255,255,.04) 70%,rgba(255,207,90,.3)) border-box;box-shadow:0 0 22px -8px rgba(255,207,90,.35)}
+.ev.rar-must::before{background:linear-gradient(var(--gold),#ff9a3c);box-shadow:0 0 8px rgba(255,207,90,.6)}
+.ev.rar-low{opacity:.85}
+.tag{font-size:10.5px;letter-spacing:.08em}
+.tag.must{background:linear-gradient(90deg,rgba(255,207,90,.25),rgba(255,154,60,.2));color:var(--gold);border:1px solid rgba(255,207,90,.5);text-shadow:0 0 8px rgba(255,207,90,.5)}
+.tag.rep{border:1px solid rgba(124,92,255,.4)}
+
+/* Neon countdowns */
+.cd{font-size:19px;font-weight:700;letter-spacing:.02em}
+.cd.red{text-shadow:0 0 12px rgba(255,93,108,.65)}
+.cd.amber{text-shadow:0 0 12px rgba(255,181,71,.5)}
+.cd.green{color:var(--cyan);text-shadow:0 0 10px rgba(62,230,255,.4)}
+.tchip b{font-size:14px;font-weight:700}
+.tchip.green b{color:var(--cyan)}
+.tchip.red{box-shadow:0 0 12px rgba(255,93,108,.25)}
+
+/* Checkboxes: glow + pop when completed */
+.chk.on{box-shadow:0 0 12px rgba(62,207,142,.7)}
+.chk.pop{animation:pop .45s ease}
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.35);box-shadow:0 0 22px rgba(62,207,142,.95)}100%{transform:scale(1)}}
+
+/* Buttons: angled corners + gradient glow */
+.btn{font-weight:700;letter-spacing:.04em}
+.primary-cta,.btn:not(.ghost):not(.danger-link){background:linear-gradient(135deg,#7c5cff,#b05cff 55%,#ff5d8f);clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);border-radius:4px;text-transform:uppercase;font-size:13.5px}
+.primary-cta:hover,.btn:not(.ghost):not(.danger-link):hover{filter:brightness(1.15)}
+.btn.danger{background:linear-gradient(135deg,#ff5d6c,#ff3d8b) !important}
+.primary-cta{box-shadow:none;filter:drop-shadow(0 4px 14px rgba(176,92,255,.45))}
+.fab{background:linear-gradient(135deg,#7c5cff,#ff5d8f);box-shadow:0 0 24px rgba(176,92,255,.6)}
+
+/* Stats as HUD pills */
+.stat{background:rgba(21,24,38,.7);backdrop-filter:blur(6px)}
+.stat b{font-size:17px;font-weight:700}
+.stat.red b{text-shadow:0 0 10px rgba(255,93,108,.6)}
+.stat.amber b{text-shadow:0 0 10px rgba(255,181,71,.5)}
+.stat.green b{text-shadow:0 0 10px rgba(62,207,142,.5)}
+.stat small{text-transform:uppercase;letter-spacing:.06em;font-size:11.5px}
+
+/* Type tabs */
+.cats button{text-transform:uppercase;letter-spacing:.06em;font-size:13px;font-weight:600}
+.cats button.on{border-bottom-color:transparent;background:linear-gradient(0deg,rgba(124,92,255,.18),transparent);box-shadow:inset 0 -2px 0 var(--accent),0 6px 14px -8px rgba(124,92,255,.8)}
+
+/* Today ring (HUD) */
+.day-ring{--p:0;width:52px;height:52px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:conic-gradient(var(--cyan) calc(var(--p)*1%),rgba(255,255,255,.08) 0);box-shadow:0 0 16px rgba(62,230,255,.25)}
+.day-ring.full{background:conic-gradient(var(--green) 100%,transparent 0);box-shadow:0 0 18px rgba(62,207,142,.55)}
+.ring-in{width:42px;height:42px;border-radius:50%;background:#0d1020;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.ring-in b{font-size:13px}
+.ring-in small{font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:2px}
+
+/* Toast */
+.toast{font-family:var(--game);letter-spacing:.04em}
+.toast.win{color:#0c0e13;font-weight:700;background:linear-gradient(90deg,#3ecf8e,#3ee6ff);border:0;box-shadow:0 0 24px rgba(62,230,255,.5);text-transform:uppercase}
+
+/* Misc */
+.empty{background:rgba(21,24,38,.5);backdrop-filter:blur(6px)}
+.linkbtn{font-family:var(--game);letter-spacing:.03em}
+.dtk.on{box-shadow:0 0 10px rgba(62,207,142,.7)}
+@media (max-width:860px){
+  .topbar h1{font-size:22px}
+  .day-ring{width:44px;height:44px}
+  .ring-in{width:36px;height:36px}
+  .ring-in b{font-size:11.5px}
+  .cd{font-size:17px}
+}
+@media (prefers-reduced-motion:reduce){ .chk.pop{animation:none} .ev:hover{transform:none} }

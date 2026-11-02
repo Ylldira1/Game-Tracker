@@ -24,7 +24,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const clean = o => JSON.parse(JSON.stringify(o));
 
-function toast(msg){ const t=$('toast'); t.textContent=msg; t.style.display='block'; clearTimeout(toast._t); toast._t=setTimeout(()=>t.style.display='none',2600); }
+function toast(msg,kind=''){ const t=$('toast'); t.textContent=msg; t.className='toast '+kind; t.style.display='block'; clearTimeout(toast._t); toast._t=setTimeout(()=>t.style.display='none',2600); }
 function setSync(cls,text){ $('syncDot').className='dot '+cls; $('syncDot2').className='dot sdot '+cls; $('syncText').textContent=text; $('menuBtn').title='Account · '+text; }
 
 /* ---------------- Storage: browser only ---------------- */
@@ -445,7 +445,7 @@ function evHtml(e,now){
   const g=state.games[e.game]||{name:'Unknown game',color:'#8b91a7'};
   const o=occ(e,now), left=o.end-now, done=isDone(e,o), u=urgency(left);
   const total=o.end-o.start, pct=total>0?Math.max(0,Math.min(100,(1-left/total)*100)):100;
-  const cls=['ev',done?'done':'',o.ended?'ended':'',(!done&&!o.ended&&u==='red')?'soon':''].join(' ');
+  const cls=['ev',done?'done':'',o.ended?'ended':'',(!done&&!o.ended&&u==='red')?'soon':'',e.prio==='must'?'rar-must':e.prio==='low'?'rar-low':''].join(' ');
   const extra=progressHtml(e,o) + (e.note?`<div class="note">${esc(e.note)}</div>`:'');
   return `<div class="${cls}" style="--c:${esc(g.color)}">
     <button class="chk ${done?'on':''}" data-toggle="${esc(e.id)}" title="${done?'Mark as not done':'Mark as done'}">${done?'✓':''}</button>
@@ -528,7 +528,9 @@ function routinePanel(type,rows,now,wide){
   const when = !mixed ? `<span class="pwhen-l">Resets in</span> ${timeChip(ends[0],false,type)}` : `<span class="pwhen-l">Each quest has its own reset</span>`;
   const body = rows.length ? sorted.map(x=>rowHtml(x,showGame,mixed)).join('')
     : `<div class="panel-empty">No ${t.label.toLowerCase()} quests yet. <button class="linkbtn" data-action="newevent" data-type="${type}">+ Add one</button></div>`;
-  return `<div class="panel ${wide?'wide':''}">
+  const clear = rows.length && done===rows.length;
+  return `<div class="panel p-${type} ${wide?'wide':''} ${clear?'clear':''}">
+    ${clear?'<span class="stamp">All clear</span>':''}
     <div class="panel-head">
       <div><span class="ptitle">${t.icon} ${t.label}</span>${rows.length?`<span class="pcount ${done===rows.length?'all':''}">${done}/${rows.length} done</span>`:''}</div>
       <div class="pwhen">${rows.length?when:''}</div>
@@ -620,6 +622,16 @@ function renderStats(){
   $('sDone').textContent=all.filter(x=>QUICK.done.test(x,now)).length;
   document.querySelectorAll('.stat').forEach(b=>b.classList.toggle('on',b.dataset.quick===state.quick));
   const todo=all.filter(x=>QUICK.open.test(x,now)).length, soon=all.filter(x=>QUICK['24h'].test(x,now)).length;
+  // Today's progress ring: daily quests (plus manual "dailies done" ticks for games without daily quests)
+  const dq=all.filter(x=>typeOf(x.e)==='daily'&&!x.o.ended);
+  let dTot=dq.length, dDone=dq.filter(x=>isDone(x.e,x.o)).length;
+  gamesSorted().filter(g=>(state.filter==='all'||g.id===state.filter)&&nextDaily(g,now)&&!dq.some(x=>x.e.game===g.id))
+    .forEach(g=>{ dTot++; if(g.dailyDoneFor===nextDaily(g,now)) dDone++; });
+  const ring=$('dayRing');
+  if(dTot){ const pct=Math.round(dDone/dTot*100); ring.hidden=false; ring.classList.toggle('full',dDone===dTot);
+    ring.style.setProperty('--p',pct); ring.title=`Today's dailies: ${dDone} of ${dTot} done`;
+    ring.innerHTML=`<span class="ring-in"><b>${dDone}/${dTot}</b><small>Today</small></span>`; }
+  else ring.hidden=true;
   $('pageSub').textContent = todo ? `${todo} quest${todo===1?'':'s'} to do${soon?` · ${soon} ending within 24h`:''}` : 'All caught up ✨';
 }
 
@@ -979,7 +991,8 @@ document.addEventListener('click',async ev=>{
   else if(d.editgame){ ev.stopPropagation(); closeDrawer(); openGame(d.editgame); }
   else if(d.action==='addgame'){ closeDrawer(); openGame(null); }
   else if(d.action==='newevent') newEvent(d.type);
-  else if(d.toggle) await updateEvent(d.toggle,(e,o)=>{ e.doneFor=isDone(e,o)?null:o.end; return e; });
+  else if(d.toggle){ let nowDone=false; await updateEvent(d.toggle,(e,o)=>{ nowDone=!isDone(e,o); e.doneFor=nowDone?o.end:null; return e; });
+    if(nowDone){ toast('✦ Quest complete!','win'); const b=document.querySelector(`[data-toggle="${CSS.escape(d.toggle)}"]`); if(b){ b.classList.add('pop'); } } }
   else if(d.cnt) await updateEvent(d.cnt,(e,o)=>{ e.count=Math.max(0,Math.min(+e.goal||0,getCount(e,o)+(+d.d))); e.countFor=o.end; return e; });
   else if(d.edit) startEdit(d.edit);
   else if(d.del){ const e=state.events[d.del]; if(!e) return;
