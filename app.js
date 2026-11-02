@@ -518,16 +518,17 @@ function timeChip(t, muted, kind){
   return `<span class="tchip ${u}" title="Resets ${esc(fmtDate(t))}">⟳ <b data-t="${t}" data-fmt="${short?'s':''}" data-chip="${kind||'x'}">${short?fmtShort(left):fmtLeft(left)}</b></span>`;
 }
 
-function routinePanel(type,rows,now,wide){
+function routinePanel(type,rows,now,wide,ctx={}){
   const t=TYPES[type];
   const sorted=[...rows].sort((a,b)=>(isDone(a.e,a.o)-isDone(b.e,b.o)) || (a.e.created||0)-(b.e.created||0));
   const done=rows.filter(x=>isDone(x.e,x.o)).length;
   const ends=[...new Set(rows.map(x=>x.o.end))];
-  const showGame = state.filter==='all';
+  const showGame = state.filter==='all' && !ctx.grouped;
+  const gattr = ctx.game?` data-game="${esc(ctx.game)}"`:'';
   const mixed = ends.length>1;
   const when = !mixed ? `<span class="pwhen-l">Resets in</span> ${timeChip(ends[0],false,type)}` : `<span class="pwhen-l">Each quest has its own reset</span>`;
   const body = rows.length ? sorted.map(x=>rowHtml(x,showGame,mixed)).join('')
-    : `<div class="panel-empty">No ${t.label.toLowerCase()} quests yet. <button class="linkbtn" data-action="newevent" data-type="${type}">+ Add one</button></div>`;
+    : `<div class="panel-empty">No ${t.label.toLowerCase()} quests yet. <button class="linkbtn" data-action="newevent" data-type="${type}"${gattr}>+ Add one</button></div>`;
   const clear = rows.length && done===rows.length;
   return `<div class="panel p-${type} ${wide?'wide':''} ${clear?'clear':''}">
     ${clear?'<span class="stamp">All clear</span>':''}
@@ -537,7 +538,7 @@ function routinePanel(type,rows,now,wide){
     </div>
     ${rows.length?`<div class="pbar wide"><i style="width:${Math.round(done/rows.length*100)}%"></i></div>`:''}
     <div class="rows">${body}</div>
-    ${rows.length?`<button class="linkbtn addrow" data-action="newevent" data-type="${type}">+ Add ${t.label.toLowerCase()} quest</button>`:''}
+    ${rows.length?`<button class="linkbtn addrow" data-action="newevent" data-type="${type}"${gattr}>+ Add ${t.label.toLowerCase()} quest</button>`:''}
   </div>`;
 }
 
@@ -561,51 +562,36 @@ function renderCats(now){
   $('cats').innerHTML=items.map(([k,l,c])=>`<button class="${state.cat===k?'on':''}" data-cat="${k}">${l}${c?` <span class="n">${c}</span>`:''}</button>`).join('');
 }
 
-function renderList(){
-  const now=Date.now(), evs=scoped(now);
+// The quests of one scope (all games, or one game): routine lists + limited-time cards
+function scopeHtml(evs,now,ctx){
   const byEnd=(a,b)=>a.o.end-b.o.end, draw=arr=>arr.map(x=>evHtml(x.e,now)).join('');
-  renderCats(now);
-  $('clearEnded').hidden=!Object.values(state.events).some(e=>occ(e,now).ended);
-
-  if(state.quick){
-    const q=QUICK[state.quick], rows=evs.filter(x=>q.test(x,now)).sort(byEnd);
-    $('quickInfo').innerHTML=`Showing <b>${q.label}</b> <button class="chip" data-quick="${state.quick}">✕ Clear</button>`;
-    $('quickInfo').hidden=false; $('cats').hidden=true; $('showDoneWrap').hidden=true;
-    $('list').innerHTML = rows.length ? draw(rows) : `<div class="empty"><p style="margin:0">Nothing here.</p></div>`;
-    return;
-  }
-  $('quickInfo').hidden=true; $('cats').hidden=false;
-
-  const empty=emptyState();
-  if(empty){ $('list').innerHTML=empty; $('showDoneWrap').hidden=true; return; }
-
+  const gattr=ctx.game?` data-game="${esc(ctx.game)}"`:'';
   const lim=evs.filter(x=>typeOf(x.e)==='limited');
   const byType={}; ROUTINES.forEach(t=>byType[t]=evs.filter(x=>typeOf(x.e)===t));
   const showLim = state.cat==='all'||state.cat==='limited';
-  $('showDoneWrap').hidden=!showLim;
-
   let html='';
   if(state.cat==='all'){
     const used=ROUTINES.filter(t=>byType[t].length);
-    if(used.length===1) html+=`<div class="panels n1">${routinePanel(used[0],byType[used[0]],now)}</div>`;
+    if(used.length===1) html+=`<div class="panels n1">${routinePanel(used[0],byType[used[0]],now,false,ctx)}</div>`;
     else if(used.length){
       // Balance the lists across two columns: each goes into the currently shorter column
       const cols=[[],[]], h=[0,0];
-      used.forEach(t=>{ const k=h[0]<=h[1]?0:1; cols[k].push(routinePanel(t,byType[t],now)); h[k]+=byType[t].length+2.5; });
+      used.forEach(t=>{ const k=h[0]<=h[1]?0:1; cols[k].push(routinePanel(t,byType[t],now,false,ctx)); h[k]+=byType[t].length+2.5; });
       html+=`<div class="pcols">${cols.map(c=>`<div class="pcol">${c.join('')}</div>`).join('')}</div>`;
     }
   }
-  if(ROUTINES.includes(state.cat)) html+=routinePanel(state.cat,byType[state.cat],now,true);
-
+  if(ROUTINES.includes(state.cat) && (byType[state.cat].length || !ctx.grouped)) html+=routinePanel(state.cat,byType[state.cat],now,true,ctx);
   if(showLim){
     const open=lim.filter(x=>!x.o.ended&&!isDone(x.e,x.o)).sort(byEnd);
     const must=open.filter(x=>x.e.prio==='must'), rest=open.filter(x=>x.e.prio!=='must');
     const doneOpen=lim.filter(x=>!x.o.ended&&isDone(x.e,x.o)).sort(byEnd);
     const ended=lim.filter(x=>x.o.ended).sort((a,b)=>b.o.end-a.o.end);
-    html+=`<div class="sec-head"><span class="section">⏳ Limited-time</span><button class="linkbtn" data-action="newevent" data-type="limited">+ Add</button></div>`;
+    const anyShown=open.length || (state.showDone&&(doneOpen.length||ended.length));
+    if(ctx.grouped && !anyShown) return html;   // keep game sections tidy
+    html+=`<div class="sec-head"><span class="section">⏳ Limited-time</span><button class="linkbtn" data-action="newevent" data-type="limited"${gattr}>+ Add</button></div>`;
     if(!open.length){
-      const gname=state.filter!=='all'&&state.games[state.filter]?state.games[state.filter].name:null;
-      html+=`<div class="empty slim"><span>✅ No limited-time quests left${gname?` in ${esc(gname)}`:''}.</span> <button class="linkbtn" data-action="newevent" data-type="limited">+ Add one</button></div>`;
+      const gname=ctx.game&&state.games[ctx.game]?state.games[ctx.game].name:null;
+      if(!ctx.grouped) html+=`<div class="empty slim"><span>✅ No limited-time quests left${gname?` in ${esc(gname)}`:''}.</span> <button class="linkbtn" data-action="newevent" data-type="limited"${gattr}>+ Add one</button></div>`;
     }else{
       if(must.length) html+=`<div class="sub">🔥 Must-do</div>${draw(must)}${rest.length?`<div class="sub">Others</div>`:''}`;
       html+=draw(rest);
@@ -617,6 +603,65 @@ function renderList(){
       html+=`<div class="hint center">${doneOpen.length} done · ${ended.length} ended (hidden)</div>`;
     }
   }
+  return html;
+}
+
+state.collapsed = new Set(prefGet('collapsed',[]));
+
+function gameBanner(g,gevs,now){
+  const open=gevs.filter(x=>!x.o.ended&&!isDone(x.e,x.o));
+  const done=gevs.filter(x=>!x.o.ended&&isDone(x.e,x.o)).length;
+  const nextLim=open.filter(x=>typeOf(x.e)==='limited').sort((a,b)=>a.o.end-b.o.end)[0];
+  const col=state.collapsed.has(g.id);
+  const shared=g.shared?`<span class="shared-ic">${!isAdmin?'🔗':g.audience==='some'?'👥':'📢'}</span>`:'';
+  return `<div class="gban" style="--c:${esc(g.color)}" data-gtoggle="${esc(g.id)}" role="button" tabindex="0" aria-expanded="${!col}">
+    <span class="gcaret">${col?'▸':'▾'}</span><span class="gsw"></span>
+    <h2>${esc(g.name)}</h2>${shared}
+    <span class="gstats">${open.length?`<b>${open.length}</b> to do`:'<b class="ok">All clear ✓</b>'}${done?` · ${done} done`:''}</span>
+    ${nextLim?`<span class="gnext" title="Next limited-time quest ends">⏳ ${timeChip(nextLim.o.end,false,'limited')}</span>`:''}
+    <span class="spacer"></span>
+    <button class="linkbtn gopen" data-filter="${esc(g.id)}" title="Show only ${esc(g.name)}">Open ›</button>
+  </div>`;
+}
+
+function renderList(){
+  const now=Date.now(), evs=scoped(now);
+  const byEnd=(a,b)=>a.o.end-b.o.end;
+  renderCats(now);
+  $('clearEnded').hidden=!Object.values(state.events).some(e=>occ(e,now).ended);
+
+  if(state.quick){
+    const q=QUICK[state.quick], rows=evs.filter(x=>q.test(x,now)).sort(byEnd);
+    $('quickInfo').innerHTML=`Showing <b>${q.label}</b> <button class="chip" data-quick="${state.quick}">✕ Clear</button>`;
+    $('quickInfo').hidden=false; $('cats').hidden=true; $('showDoneWrap').hidden=true;
+    $('list').innerHTML = rows.length ? rows.map(x=>evHtml(x.e,now)).join('') : `<div class="empty"><p style="margin:0">Nothing here.</p></div>`;
+    return;
+  }
+  $('quickInfo').hidden=true; $('cats').hidden=false;
+
+  const empty=emptyState();
+  if(empty){ $('list').innerHTML=empty; $('showDoneWrap').hidden=true; return; }
+  $('showDoneWrap').hidden=!(state.cat==='all'||state.cat==='limited');
+
+  // One game selected: its quests as before
+  if(state.filter!=='all'){ $('list').innerHTML=scopeHtml(evs,now,{game:state.filter,grouped:false}); return; }
+
+  // All games: "Ending soon" summary, then one section per game
+  let html='';
+  if(state.cat==='all'||state.cat==='limited'){
+    const soon=evs.filter(x=>typeOf(x.e)==='limited'&&!x.o.ended&&!isDone(x.e,x.o)&&x.o.end-now<3*D).sort(byEnd);
+    if(soon.length) html+=`<div class="panel soon-panel">
+      <div class="panel-head"><div><span class="ptitle">⚠️ Ending soon</span><span class="pcount">${soon.length} within 3 days</span></div></div>
+      <div class="rows">${soon.map(x=>rowHtml(x,true,true)).join('')}</div></div>`;
+  }
+  const sections=gamesSorted().map(g=>{
+    const gevs=evs.filter(x=>x.e.game===g.id);
+    const inner=scopeHtml(gevs,now,{game:g.id,grouped:true});
+    if(!inner.trim()) return '';
+    const shown=state.cat==='all'?gevs:gevs.filter(x=>typeOf(x.e)===state.cat);
+    return `<section class="gsec" style="--c:${esc(g.color)}">${gameBanner(g,shown,now)}${state.collapsed.has(g.id)?'':`<div class="gbody">${inner}</div>`}</section>`;
+  }).join('');
+  html+= sections || `<div class="empty"><p style="margin:0">No ${state.cat==='all'?'':TYPES[state.cat].label.toLowerCase()+' '}quests here yet.</p></div>`;
   $('list').innerHTML=html;
 }
 
@@ -717,10 +762,10 @@ function resetForm(){
   $('fErr').textContent=''; $('formTitle').textContent='New quest'; $('fSubmit').textContent='Add quest';
   $('moreOpts').open=false;
 }
-function newEvent(type){
+function newEvent(type,gameId){
   if(!gamesSorted().length){ toast('Add a game first.'); return openGame(null); }
   fillMonthDay(); resetForm();
-  const pick = state.filter!=='all' ? state.filter : state.lastGame;
+  const pick = gameId || (state.filter!=='all' ? state.filter : state.lastGame);
   if(pick && state.games[pick]) $('fGame').value=pick;
   fillMonthDay();
   setType(TYPES[type]?type:(state.cat!=='all'?state.cat:'limited'));
@@ -984,10 +1029,11 @@ document.addEventListener('click',async ev=>{
   if(close){ closeModal(close.dataset.close); return; }
   const zoom=ev.target.closest('[data-zoom]');
   if(zoom){ const q=state.events[zoom.dataset.zoom]; if(q&&q.img){ $('imgView').src=q.img; $('imgCap').textContent=q.name; openModal('imgModal'); } return; }
-  const t=ev.target.closest('[data-toggle],[data-edit],[data-del],[data-editgame],[data-filter],[data-daily],[data-cnt],[data-action],[data-quick],[data-cat],[data-collapse],[data-follow],#clearEnded');
+  const t=ev.target.closest('[data-toggle],[data-edit],[data-del],[data-editgame],[data-filter],[data-daily],[data-cnt],[data-action],[data-quick],[data-cat],[data-collapse],[data-follow],[data-gtoggle],#clearEnded');
   if(!t) return;
   const d=t.dataset;
   if(d.quick){ state.quick = state.quick===d.quick ? null : d.quick; renderList(); renderStats(); return; }
+  if(d.gtoggle && !d.filter){ const id=d.gtoggle; state.collapsed.has(id)?state.collapsed.delete(id):state.collapsed.add(id); prefSet('collapsed',[...state.collapsed]); renderList(); return; }
   if(d.cat){ state.cat=d.cat; prefSet('cat',state.cat); renderList(); return; }
   if(d.collapse==='resets'){ state.resetsOpen=!state.resetsOpen; prefSet('resetsOpen',state.resetsOpen); renderResets(); return; }
   if(d.filter && !d.editgame){ closeDrawer(); state.filter=d.filter; prefSet('filter',state.filter); renderTabs(); renderResets(); renderList(); renderStats(); return; }
@@ -996,7 +1042,7 @@ document.addEventListener('click',async ev=>{
     if(sharedAvailable().length) openGame(null); else closeGame(); }
   else if(d.editgame){ ev.stopPropagation(); closeDrawer(); openGame(d.editgame); }
   else if(d.action==='addgame'){ closeDrawer(); openGame(null); }
-  else if(d.action==='newevent') newEvent(d.type);
+  else if(d.action==='newevent') newEvent(d.type,d.game);
   else if(d.toggle){ let nowDone=false; await updateEvent(d.toggle,(e,o)=>{ nowDone=!isDone(e,o); e.doneFor=nowDone?o.end:null; return e; });
     if(nowDone){ toast('✦ Quest complete!','win'); const b=document.querySelector(`[data-toggle="${CSS.escape(d.toggle)}"]`); if(b){ b.classList.add('pop'); } } }
   else if(d.cnt) await updateEvent(d.cnt,(e,o)=>{ e.count=Math.max(0,Math.min(+e.goal||0,getCount(e,o)+(+d.d))); e.countFor=o.end; return e; });
@@ -1016,7 +1062,7 @@ document.addEventListener('change',async ev=>{
     await updateEvent(t.dataset.chk,(e,o)=>{ const c=new Set(getChecks(e,o)); t.checked?c.add(i):c.delete(i); e.checks=[...c].sort((a,b)=>a-b); e.checkFor=o.end; return e; }); }
 });
 document.addEventListener('keydown',e=>{
-  if(e.key==='Enter' && e.target.classList && e.target.classList.contains('sb-item')){ e.target.click(); return; }
+  if(e.key==='Enter' && e.target.classList && (e.target.classList.contains('sb-item')||e.target.classList.contains('gban'))){ e.target.click(); return; }
   if(e.key==='Escape'){ closeDrawer(); ['eventModal','gameModal','confirm','nameModal','imgModal'].forEach(closeModal); closeMenu(); return; }
   const typing=/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
   if(!typing && (e.key==='n'||e.key==='N') && !document.querySelector('.modal.show') && !$('app').hidden){ e.preventDefault(); newEvent(); }
