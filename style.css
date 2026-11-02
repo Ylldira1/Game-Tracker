@@ -23,7 +23,7 @@ h1,h2{letter-spacing:-.02em}
 #app{width:100%;max-width:1080px;padding:28px 32px 100px}
 
 /* ---------- Sidebar ---------- */
-.sidebar{width:var(--side-w);flex:none;position:sticky;top:0;height:100vh;background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column}
+.sidebar{width:var(--side-w);flex:none;position:sticky;top:0;height:100vh;height:100dvh;background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column}
 body:has(#signin:not([hidden])) .sidebar{display:none}
 .sb-brand{display:flex;align-items:center;gap:10px;padding:20px 18px 14px}
 .sb-brand .logo{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,#7c5cff,#ff5d8f);font-size:18px}
@@ -56,7 +56,7 @@ body:has(#signin:not([hidden])) .sidebar{display:none}
 [data-daily].dtk{cursor:pointer}
 [data-daily].dtk:hover{border-color:var(--green)}
 .dtk.on{background:var(--green);border-color:var(--green);color:#0c0e13;font-weight:700;font-size:10px}
-.sb-foot{border-top:1px solid var(--line);padding:12px 14px 14px;display:flex;flex-direction:column;gap:10px}
+.sb-foot{border-top:1px solid var(--line);padding:12px 14px calc(14px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px;flex:none;background:var(--side)}
 .sb-user{display:flex;align-items:center;gap:8px}
 #userBox{flex:1;min-width:0;display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:500}
 #userBox > span:not(.avatar):not(.admin-badge){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -346,7 +346,7 @@ fieldset:disabled{opacity:.6}
 @media (min-width:861px){ .fab{display:none} }
 @media (max-width:1100px){ .panels.n3{grid-template-columns:1fr 1fr} .panels.n3 .panel:last-child{grid-column:1/-1} }
 @media (max-width:860px){
-  .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:45;width:min(300px,86vw);transform:translateX(-102%);transition:transform .22s ease;box-shadow:20px 0 40px rgba(0,0,0,.4)}
+  .sidebar{position:fixed;left:0;top:0;bottom:0;height:auto;max-height:100dvh;z-index:45;width:min(300px,86vw);transform:translateX(-102%);transition:transform .22s ease;box-shadow:20px 0 40px rgba(0,0,0,.4)}
   body.drawer .sidebar{transform:none}
   .scrim{display:block;position:fixed;inset:0;background:rgba(5,6,10,.6);z-index:44;opacity:0;pointer-events:none;transition:opacity .2s}
   body.drawer .scrim{opacity:1;pointer-events:auto}
