@@ -523,3 +523,12 @@ body{
   .cd{font-size:17px}
 }
 @media (prefers-reduced-motion:reduce){ .chk.pop{animation:none} .ev:hover{transform:none} }
+
+/* ---------- Balanced panel columns (no stretched empty boxes) ---------- */
+.pcols{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;margin-bottom:10px}
+.pcol{display:flex;flex-direction:column;gap:12px;min-width:0}
+.panels.n1{display:block;margin-bottom:10px}
+@media (max-width:860px){ .pcols{grid-template-columns:1fr} }
+/* Use more of wide screens */
+#app{max-width:1280px}
+@media (min-width:1700px){ #app{max-width:1400px} }

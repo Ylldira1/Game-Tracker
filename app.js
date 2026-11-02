@@ -587,7 +587,13 @@ function renderList(){
   let html='';
   if(state.cat==='all'){
     const used=ROUTINES.filter(t=>byType[t].length);
-    if(used.length) html+=`<div class="panels n${used.length}">${used.map(t=>routinePanel(t,byType[t],now)).join('')}</div>`;
+    if(used.length===1) html+=`<div class="panels n1">${routinePanel(used[0],byType[used[0]],now)}</div>`;
+    else if(used.length){
+      // Balance the lists across two columns: each goes into the currently shorter column
+      const cols=[[],[]], h=[0,0];
+      used.forEach(t=>{ const k=h[0]<=h[1]?0:1; cols[k].push(routinePanel(t,byType[t],now)); h[k]+=byType[t].length+2.5; });
+      html+=`<div class="pcols">${cols.map(c=>`<div class="pcol">${c.join('')}</div>`).join('')}</div>`;
+    }
   }
   if(ROUTINES.includes(state.cat)) html+=routinePanel(state.cat,byType[state.cat],now,true);
 
