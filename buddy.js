@@ -453,7 +453,8 @@
   /* ---------- Buddy collection (one menu item → picker window) ---------- */
   const TAGS = { mochi: 'Walks, jumps & naps', pika: 'Hops, sparks & tumbles', paimon: 'Floats & teleports' };
   const exp = document.getElementById('exportBtn');
-  const menuBtn = document.createElement('button'); menuBtn.id = 'buddiesBtn';
+  const menuBtn = document.createElement('button'); menuBtn.id = 'buddiesBtn'; menuBtn.className = 'mi';
+  menuBtn.innerHTML = `<span class="mi-ic" style="--ic:#ff7eb6"><svg viewBox="0 0 24 24" fill="currentColor"><ellipse cx="6" cy="10" rx="2.2" ry="2.8"/><ellipse cx="10" cy="5.5" rx="2.2" ry="2.8"/><ellipse cx="14.5" cy="5.5" rx="2.2" ry="2.8"/><ellipse cx="18.5" cy="10" rx="2.2" ry="2.8"/><path d="M12.2 11c-3.2 0-6.2 4.4-6.2 6.8 0 1.7 1.3 2.7 3 2.7 1.3 0 2.2-.7 3.2-.7s1.9.7 3.2.7c1.7 0 3-1 3-2.7 0-2.4-3-6.8-6.2-6.8z"/></svg></span><span class="mi-tx"><b>Buddies</b><small>Page companions</small></span><span class="mi-badge"></span>`;
   if (exp) exp.parentNode.insertBefore(menuBtn, exp);
   const modal = document.createElement('div'); modal.className = 'modal'; modal.id = 'buddyModal';
   modal.innerHTML = `<div class="card bd-card">
@@ -505,7 +506,7 @@
 
   function refresh() {
     const n = buddies.filter(x => x.on).length;
-    menuBtn.textContent = `🐾 Buddies${n ? ` · ${n} on` : ''}`;
+    const bdg = menuBtn.querySelector('.mi-badge'); bdg.textContent = n ? `${n} on` : 'Off'; bdg.classList.toggle('off', !n);
     modal.querySelector('.bd-count').textContent = `${n} of ${buddies.length} showing`;
     grid.querySelectorAll('.bd-item').forEach(el => {
       const on = buddies[+el.dataset.i].on;

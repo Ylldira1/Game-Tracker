@@ -55,11 +55,11 @@
             <div class="menu-head" id="userBox"></div>
             <div class="sync menu-sync"><span class="dot" id="syncDot"></span><span id="syncText">Loading…</span></div>
             <div class="menu-sep"></div>
-            <button id="nameBtn" hidden>👤 Edit profile</button>
-            <button id="exportBtn">⬇ Export backup</button>
-            <label class="menu-item">⬆ Import backup<input type="file" id="importFile" accept=".json,application/json" hidden></label>
+            <button id="nameBtn" class="mi" hidden><span class="mi-ic" style="--ic:#a78bfa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><span class="mi-tx"><b>Edit profile</b><small>Name &amp; picture</small></span></button>
+            <button id="exportBtn" class="mi"><span class="mi-ic" style="--ic:#22d3ee"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></span><span class="mi-tx"><b>Export backup</b><small>Save your quests to a file</small></span></button>
+            <label class="menu-item mi"><span class="mi-ic" style="--ic:#5ee6a0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/></svg></span><span class="mi-tx"><b>Import backup</b><small>Restore from a file</small></span><input type="file" id="importFile" accept=".json,application/json" hidden></label>
             <div class="menu-sep" id="signOutSep" hidden></div>
-            <button id="signOutBtn" hidden>Sign out</button>
+            <button id="signOutBtn" class="mi danger" hidden><span class="mi-ic" style="--ic:#ff5d6c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg></span><span class="mi-tx"><b>Sign out</b><small></small></span></button>
           </div>
         </div>
       </header>
