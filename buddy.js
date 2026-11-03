@@ -450,14 +450,90 @@
     }
   }).observe(toastEl, { attributes: true, attributeFilter: ['class', 'style'] });
 
+  /* ---------- Buddy collection (one menu item → picker window) ---------- */
+  const TAGS = { mochi: 'Walks, jumps & naps', pika: 'Hops, sparks & tumbles', paimon: 'Floats & teleports' };
   const exp = document.getElementById('exportBtn');
+  const menuBtn = document.createElement('button'); menuBtn.id = 'buddiesBtn';
+  if (exp) exp.parentNode.insertBefore(menuBtn, exp);
+  const modal = document.createElement('div'); modal.className = 'modal'; modal.id = 'buddyModal';
+  modal.innerHTML = `<div class="card bd-card">
+    <div class="modal-head"><h2>🐾 Buddies</h2><button class="icon-btn" type="button" data-close="buddyModal" aria-label="Close">✕</button></div>
+    <p class="hint" style="margin:2px 0 12px">Pick who hangs out on your page. Click a buddy to pet it, drag to throw it.</p>
+    <div class="bd-grid"></div>
+    <div class="bd-foot"><span class="bd-count"></span><span class="spacer"></span>
+      <button type="button" class="linkbtn" data-bd="none">Hide all</button><button type="button" class="linkbtn" data-bd="all">Show all</button></div>
+  </div>`;
+  document.body.appendChild(modal);
+  const grid = modal.querySelector('.bd-grid');
+
+  // live previews
+  const PS = 3;
+  function previewFrame(bd, t) {
+    const K = bd.K;
+    if (K.sheet) {
+      const SH = window.BUDDY_SHEETS[K.sheet], n = SH.anims.Idle ? 'Idle' : 'Stand', A = SH.anims[n];
+      const total = A.d.reduce((a, c) => a + c, 0) * 1000 / 60; let acc = 0, tt = t % total, i = 0;
+      for (; i < A.d.length; i++) { acc += A.d[i] * 1000 / 60; if (tt < acc) break; }
+      return { sheet: SH, fi: A.dirs.dr[Math.min(i, A.d.length - 1)] };
+    }
+    return null;
+  }
+  const imgs = {};
+  function drawPreview(bd, c, t) {
+    const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); g.imageSmoothingEnabled = false;
+    const K = bd.K, bob = K.float ? Math.sin(t / 520) * 3 : 0;
+    if (K.sheet) {
+      const { sheet, fi } = previewFrame(bd, t);
+      const im = imgs[K.sheet] || (imgs[K.sheet] = Object.assign(new Image(), { src: sheet.img }));
+      const [sx, sy, w, h, ax, ay] = sheet.frames[fi];
+      const top = (K.float ? 18 : 10), ps = Math.min(PS, Math.floor((c.height - top - 8) / ay));
+      if (im.complete) g.drawImage(im, sx, sy, w, h, Math.round(c.width / 2 - ax * ps), Math.round(c.height - top - ay * ps + bob), w * ps, h * ps);
+    } else {
+      const k = t / 1000, blink = (t % 3200) < 130;
+      const o = { sx: 1, sy: 1 + Math.sin(k * 3) * 0.025, bob: 0, eyes: blink ? 'closed' : 'open', feet: 0, tuck: false, sway: Math.round(Math.sin(k * 2.2) * 0.6), flap: 0, face: 1 };
+      const grid = {}; K.draw((x, y, cc) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && x < K.W && y >= 0 && y < K.H) grid[x + ',' + y] = cc; }, o, K.W, K.H);
+      const ox = Math.round(c.width / 2 - K.W * PS / 2), oy = c.height - 10 - K.H * PS;
+      for (const key in grid) { const [x, y] = key.split(',').map(Number); g.fillStyle = K.pal[grid[key]]; g.fillRect(ox + x * PS, oy + y * PS, PS, PS); }
+    }
+  }
+  let prevRaf = 0;
+  function previewLoop(t) {
+    if (!modal.classList.contains('show')) { prevRaf = 0; return; }
+    grid.querySelectorAll('canvas').forEach(c => drawPreview(buddies[+c.dataset.i], c, t));
+    prevRaf = requestAnimationFrame(previewLoop);
+  }
+
+  function refresh() {
+    const n = buddies.filter(x => x.on).length;
+    menuBtn.textContent = `🐾 Buddies${n ? ` · ${n} on` : ''}`;
+    modal.querySelector('.bd-count').textContent = `${n} of ${buddies.length} showing`;
+    grid.querySelectorAll('.bd-item').forEach(el => {
+      const on = buddies[+el.dataset.i].on;
+      el.classList.toggle('on', on); el.setAttribute('aria-pressed', on);
+      el.querySelector('.bd-state').textContent = on ? '✓ On' : 'Off';
+    });
+  }
+  grid.innerHTML = buddies.map((bd, i) => `<button type="button" class="bd-item" data-i="${i}" style="--bg:${bd.K.glow}">
+      <span class="bd-prev"><canvas width="132" height="120" data-i="${i}"></canvas></span>
+      <span class="bd-name">${bd.K.icon} ${bd.K.name}</span>
+      <span class="bd-tag">${TAGS[bd.kind] || ''}</span>
+      <span class="bd-state"></span></button>`).join('');
+  function setOn(bd, v) { if (v === bd.on) return; if (v) { bd.start(); kick(); } else bd.stop(); setPref(bd.K.pref, bd.on); }
+  grid.addEventListener('click', e => { const it = e.target.closest('.bd-item'); if (!it) return; const bd = buddies[+it.dataset.i]; setOn(bd, !bd.on); refresh(); });
+  modal.addEventListener('click', e => {
+    const a = e.target.closest('[data-bd]'); if (a) { buddies.forEach(bd => setOn(bd, a.dataset.bd === 'all')); refresh(); return; }
+    if (e.target === modal) modal.classList.remove('show');
+  });
+  addEventListener('keydown', e => { if (e.key === 'Escape') modal.classList.remove('show'); });
+  menuBtn.addEventListener('click', () => {
+    const m = document.getElementById('menu'); if (m) m.hidden = true;
+    refresh(); modal.classList.add('show');
+    if (!prevRaf) prevRaf = requestAnimationFrame(previewLoop);
+  });
+
   buddies.forEach(bd => {
     const wanted = getPref(bd.K.pref) ?? (innerWidth >= 600);
-    const btn = document.createElement('button');
-    const label = () => { btn.textContent = `${bd.K.icon} ${bd.on ? 'Hide' : 'Show'} ${bd.K.name}`; };
-    btn.addEventListener('click', () => { if (bd.on) bd.stop(); else { bd.start(); kick(); } setPref(bd.K.pref, bd.on); label(); });
-    if (exp) exp.parentNode.insertBefore(btn, exp);
-    if (wanted) setTimeout(() => { bd.start(); kick(); label(); }, 1200 + Math.random() * 600);
-    label();
+    if (wanted) setTimeout(() => { bd.start(); kick(); refresh(); }, 1200 + Math.random() * 600);
   });
+  refresh();
 })();

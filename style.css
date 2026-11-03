@@ -583,3 +583,20 @@ a,button,label,select,summary,[role=button],[data-filter],[data-toggle],[data-gt
 .buddy-drag,.buddy-drag *{user-select:none!important;-webkit-user-select:none!important}
 .buddy-fxs{position:fixed;left:0;top:0;z-index:34;pointer-events:none;image-rendering:pixelated;filter:drop-shadow(0 0 4px rgba(140,220,255,.9)) drop-shadow(0 0 10px rgba(140,220,255,.5))}
 .buddy-shadow{position:fixed;left:0;top:0;width:34px;height:7px;margin:-4px 0 0 -17px;border-radius:50%;background:rgba(0,0,0,.6);filter:blur(1.5px);pointer-events:none;z-index:33;opacity:0}
+
+/* ===== Buddy collection window ===== */
+.modal .card.bd-card{max-width:620px}
+.bd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.bd-item{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 10px 12px;border-radius:14px;cursor:pointer;color:inherit;font:inherit;text-align:center;
+  background:#10142299;border:1px solid rgba(255,255,255,.08);transition:transform .15s,border-color .15s,box-shadow .15s}
+.bd-item:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.22)}
+.bd-item.on{border-color:rgba(124,92,255,.85);box-shadow:0 0 0 1px rgba(124,92,255,.5),0 0 22px var(--bg)}
+.bd-prev{display:block;width:100%;border-radius:10px;background:radial-gradient(circle at 50% 75%,var(--bg),transparent 65%),linear-gradient(#1a1f35,#0d1020);overflow:hidden}
+.bd-prev canvas{display:block;margin:0 auto;image-rendering:pixelated}
+.bd-item:not(.on) .bd-prev canvas{opacity:.45;filter:grayscale(.7)}
+.bd-name{font-family:var(--game,inherit);font-weight:700;font-size:16px;letter-spacing:.03em;margin-top:4px}
+.bd-tag{font-size:12px;color:#aab2cc}
+.bd-state{position:absolute;top:8px;right:8px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.08);color:#aab2cc}
+.bd-item.on .bd-state{background:linear-gradient(90deg,#7c5cff,#e04fd1);color:#fff}
+.bd-foot{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:13px;color:#aab2cc}
+.bd-foot .spacer{flex:1}
