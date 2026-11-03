@@ -202,7 +202,13 @@
           fxSheet('Fx', b.x, b.y - b.ht / 2, true); setState('hover', 1500 + Math.random() * 2000);
         }
       } else {
-        if (!r) { flyTo(pickPlat()); r = supRect(); }
+        if (!r) {                                     // list was redrawn: re-attach to whatever is now under her
+          scan();
+          const gap = b.st === 'sleep' ? 4 : HOV;
+          const p = plats.find(p => b.x >= p.l - 6 && b.x <= p.r + 6 && Math.abs(p.t - gap - b.y) < 40);
+          if (p) b.sup = p.el; else if (b.st === 'sleep') b.sup = null; else flyTo(pickPlat());
+          r = supRect();
+        }
         if (!r.floor && (r.t < 30 || r.t > innerHeight + 10)) { b.hidden = true; setState('poof', 0); }
         else {
           const sleep = b.st === 'sleep', ty = r.t - (sleep ? 4 : HOV);
@@ -222,11 +228,21 @@
         }
       }
       // draw
-      const bob = (b.st === 'sleep' || b.st === 'held') ? 0 : Math.sin(t / 520) * 3;
+      let bob = b.st === 'held' ? 0 : Math.sin(t / 520) * 3, extra = '';
       const [ax, ay] = drawSheet(t, floatFrame(t));
+      if (b.st === 'sleep') {
+        // dozing: slow breathing + slowly nodding off, then a little jolt back up
+        const ph = (t % 6500) / 6500;
+        const droop = ph < 0.82 ? 3 + 11 * (ph / 0.82) ** 1.6 : 14 - 12 * Math.min(1, (ph - 0.82) / 0.05);
+        const jolt = ph > 0.82 && ph < 0.9 ? -3 * Math.sin((ph - 0.82) / 0.08 * Math.PI) : 0;
+        bob = Math.sin(t / 1500) * 1.5 + jolt;
+        const breathe = 1 + Math.sin(t / 900) * 0.03;
+        extra = ` rotate(${(droop * b.face).toFixed(1)}deg) scale(${(2 - breathe).toFixed(3)},${breathe.toFixed(3)})`;
+      }
       b.ht = ay;
       cv.style.opacity = b.hidden ? 0 : 1;
-      cv.style.transform = `translate(${Math.round(b.x - ax)}px,${Math.round(b.y + bob - ay)}px)`;
+      cv.style.transformOrigin = `${Math.round(ax)}px ${Math.round(ay)}px`;
+      cv.style.transform = `translate(${Math.round(b.x - ax)}px,${Math.round(b.y + bob - ay)}px)` + extra;
       r = supRect();
       if (r && b.st !== 'held' && !b.hidden) {
         const gap = Math.max(0, r.t - b.y - bob), k = Math.max(0.3, Math.min(1, 1 - gap / 220));
