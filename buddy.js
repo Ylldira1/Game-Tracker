@@ -57,7 +57,7 @@
     pika: { name: 'Pikachu', icon: '⚡', pref: 'get.buddy3', sheet: 'pika', scale: 2, glow: 'rgba(255,220,60,.35)',
       hello: 'Pika pika! ⚡', held: 'Pikaaa?! ⚡', ouch: ['Pika…!', 'Ow ow…'], spark: '⚡', lines: ['Pika?', 'Pikaaa~ ⚡', 'Chu! Do your quests!', 'Pika pi! ✦'],
       clicks: ['Pose', 'Shock', 'Charge', 'Nod'], extras: ['LookUp', 'Eat', 'DeepBreath', 'Rotate', 'Nod', 'Sit'] },
-    lumine: { name: 'Lumine', icon: '🌟', pref: 'get.buddy5', sheet: 'lumine', scale: 1, glow: 'rgba(255,214,120,.35)',
+    lumine: { name: 'Lumine', icon: '🌟', pref: 'get.buddy5', sheet: 'lumine', scale: 1, speed: 2.3, glow: 'rgba(255,214,120,.35)',
       hello: 'Hi! Ready for an adventure? ✦', held: 'W-wait, put me down!', ouch: ['Oof…', 'Ouch!'],
       lines: ['Let\'s check today\'s quests!', 'Teyvat won\'t explore itself~', 'Have you seen my brother?', 'Ad astra abyssosque!'],
       clicks: ['Wave', 'Pose', 'Shy'], extras: ['Look', 'Shy', 'Wave', 'Look'] },
@@ -360,7 +360,7 @@
         b.y = r.t;
         if (b.x < r.l - 4 || b.x > r.r + 4) { b.vx = b.face * 1.5; setState('fall'); return; }
         if (b.st === 'walk') {
-          b.x += b.face * 1.15 * dt;
+          b.x += b.face * (K.speed || 1.15) * dt;
           if ((b.face > 0 && b.x >= b.tx) || (b.face < 0 && b.x <= b.tx) || b.x <= r.l || b.x >= r.r) { b.x = Math.max(r.l, Math.min(r.r, b.x)); setState('idle', 800 + Math.random() * 2000); }
         } else if (b.st === 'sleep') {
           if (t - lastZ > 1300) { lastZ = t; fx('z', 'zz'); }
