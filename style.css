@@ -632,3 +632,38 @@ a,button,label,select,summary,[role=button],[data-filter],[data-toggle],[data-gt
   #showDoneWrap{padding:2px 0;font-size:12.5px}
   #clearEnded{margin:0 0 0 auto}
 }
+
+/* ===== Mobile declutter ===== */
+.acts .more{display:none}
+@media (max-width:600px){
+  /* edit/delete live behind ⋯ */
+  .acts .more{display:grid;width:30px;height:28px;font-size:18px;line-height:1;color:#c9cfe4;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12)}
+  .acts .edit,.acts .del,.acts .hide{display:none}
+  .open .acts .edit,.open .acts .del,.open .acts .hide{display:grid;animation:actIn .15s ease-out}
+  .open .acts .more{color:#fff;background:var(--accent);border-color:var(--accent)}
+  .qrow.open .tchip{display:none}
+  @keyframes actIn{from{opacity:0;transform:translateX(6px)}to{opacity:1;transform:none}}
+  .right{flex-direction:row;align-items:center;gap:8px}
+  .ev .right{flex-direction:column;align-items:flex-end;gap:6px}
+
+  /* stats: one compact 4-up row instead of a sideways-scrolling strip */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;overflow:visible;margin:0 0 12px;padding:0}
+  .stat{flex-direction:column;align-items:center;gap:1px;padding:7px 4px;border-radius:12px;min-width:0}
+  .stat b{font-size:17px;line-height:1.1}
+  .stat small{font-size:9.5px;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+
+  /* duplicates: header count = "to do" stat; reset timers live inside each Daily/Weekly panel */
+  #pageSub{display:none}
+  #resets{display:none}
+
+  /* tabs scroll sideways: fade the edge so it's obvious there's more */
+  .list-head .cats{-webkit-mask-image:linear-gradient(90deg,#000 85%,transparent);mask-image:linear-gradient(90deg,#000 85%,transparent);padding-right:24px}
+
+  /* breathing room so the + button never covers the last quest */
+  #list{padding-bottom:84px}
+  .fab{width:52px;height:52px;font-size:26px;right:14px;bottom:calc(16px + env(safe-area-inset-bottom))}
+}
+@media (max-width:600px){
+  .qrow .rright{flex-direction:row!important;flex-wrap:nowrap;align-items:center;gap:6px;align-self:flex-start}
+  .qrow .rright .acts{flex-direction:row}
+}

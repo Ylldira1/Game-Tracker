@@ -503,9 +503,10 @@ const ICON={
   trash:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>',
   hide:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10 10 0 0 1 12 20C5 20 1 12 1 12a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9 9 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M1 1l22 22"/></svg>',
 };
+const MORE='<button class="more" data-more title="More" aria-label="More actions">⋯</button>';
 function actsHtml(e){
-  if(!canEdit(e)) return `<div class="acts"><button class="hide" data-del="${esc(e.id)}" title="Hide for me" aria-label="Hide for me">${ICON.hide}</button></div>`;
-  return `<div class="acts"><button class="edit" data-edit="${esc(e.id)}" title="Edit" aria-label="Edit">${ICON.edit}</button><button class="del" data-del="${esc(e.id)}" title="Delete" aria-label="Delete">${ICON.trash}</button></div>`;
+  if(!canEdit(e)) return `<div class="acts">${MORE}<button class="hide" data-del="${esc(e.id)}" title="Hide for me" aria-label="Hide for me">${ICON.hide}</button></div>`;
+  return `<div class="acts">${MORE}<button class="edit" data-edit="${esc(e.id)}" title="Edit" aria-label="Edit">${ICON.edit}</button><button class="del" data-del="${esc(e.id)}" title="Delete" aria-label="Delete">${ICON.trash}</button></div>`;
 }
 // Readable countdown chip, coloured by how soon it is
 // Daily timers are always under 24h, so they only warn in the last few hours
@@ -1025,6 +1026,10 @@ $('cYes').onclick=async()=>{ $('confirm').classList.remove('show'); const f=conf
 async function updateEvent(id,fn){ const e=state.events[id]; if(!e) return; const n=fn({...e},occ(e,Date.now())); state.events[id]=n; renderAll(); await store.saveEvent(n); }
 
 document.addEventListener('click',async ev=>{
+  // phones: the ⋯ button reveals a row's edit/delete; tapping elsewhere closes it
+  const more=ev.target.closest('[data-more]'), openRow=document.querySelector('.qrow.open,.ev.open');
+  if(more){ const row=more.closest('.qrow,.ev'); if(openRow&&openRow!==row) openRow.classList.remove('open'); row.classList.toggle('open'); return; }
+  if(openRow && !ev.target.closest('.acts')) openRow.classList.remove('open');
   const close=ev.target.closest('[data-close]');
   if(close){ closeModal(close.dataset.close); return; }
   const zoom=ev.target.closest('[data-zoom]');
