@@ -581,5 +581,5 @@ a,button,label,select,summary,[role=button],[data-filter],[data-toggle],[data-gt
 .buddy-fx.heart{color:#ff7eb6}.buddy-fx.spark{color:#7df9ff}.buddy-fx.zz{color:#cfc4ff;font-size:13px}
 @keyframes bfx{0%{opacity:0;transform:translateY(0) scale(.6)}15%{opacity:1}100%{opacity:0;transform:translateY(-38px) translateX(10px) scale(1.15)}}
 .buddy-drag,.buddy-drag *{user-select:none!important;-webkit-user-select:none!important}
-.buddy-fxs{position:fixed;left:0;top:0;z-index:34;pointer-events:none;image-rendering:pixelated}
+.buddy-fxs{position:fixed;left:0;top:0;z-index:34;pointer-events:none;image-rendering:pixelated;filter:drop-shadow(0 0 4px rgba(140,220,255,.9)) drop-shadow(0 0 10px rgba(140,220,255,.5))}
 .buddy-shadow{position:fixed;left:0;top:0;width:34px;height:7px;margin:-4px 0 0 -17px;border-radius:50%;background:rgba(0,0,0,.6);filter:blur(1.5px);pointer-events:none;z-index:33;opacity:0}

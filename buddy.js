@@ -149,10 +149,11 @@
       const tick = () => {
         if (i >= ids.length || !on) { c.remove(); return; }
         const [sx, sy, w, h, ax, ay] = SH.frames[ids[i++]];
-        c.width = w * SC; c.height = h * SC; g.imageSmoothingEnabled = false;
-        g.drawImage(img, sx, sy, w, h, 0, 0, w * SC, h * SC);
-        c.style.transform = `translate(${Math.round(x - ax * SC)}px,${Math.round(y - ay * SC)}px)`;
-        setTimeout(tick, 55);
+        const FS = SC * 1.5;
+        c.width = w * FS; c.height = h * FS; g.imageSmoothingEnabled = false;
+        g.drawImage(img, sx, sy, w, h, 0, 0, w * FS, h * FS);
+        c.style.transform = `translate(${Math.round(x - ax * FS)}px,${Math.round(y - ay * FS)}px)`;
+        setTimeout(tick, 70);
       };
       tick();
     }
@@ -170,7 +171,7 @@
       const roll = Math.random(), r = supRect();
       if (roll < 0.4) { const p = pickPlat(b.sup); if (p) { flyTo(p); return; } }
       if (roll < 0.62 && r && !r.floor) { flyTo({ el: b.sup }, r.l + Math.random() * (r.r - r.l)); return; }
-      if (roll < 0.72) { poof(); return; }
+      if (roll < 0.8) { poof(); return; }
       setState('hover', playOnce(pick(K.extras)) + 800);
     }
     function floatFrame(t) {
@@ -303,7 +304,7 @@
     function celebrate(text) {
       if (!on || b.st === 'held') return;
       if (K.float) {
-        b.hidden = false; setState('hover', playOnce('Taunt') + 300);
+        b.hidden = false; setState('hover', playOnce('Taunt') + 300); fxSheet('Fx', b.x, b.y - b.ht / 2);
         for (let i = 0; i < 4; i++) setTimeout(() => fx(i % 2 ? '✦' : '♥', i % 2 ? 'spark' : 'heart'), i * 120);
         if (text) bubble(text); return;
       }
@@ -312,7 +313,7 @@
       for (let i = 0; i < 4; i++) setTimeout(() => fx(i % 2 ? '✦' : '♥', i % 2 ? 'spark' : 'heart'), i * 120);
       if (text) bubble(text);
     }
-    function wake() { lastAct = Date.now(); setState(K.float ? 'hover' : 'idle', SH ? playOnce('Wake') + 300 : 900); b.happyUntil = performance.now() + 900; fx('!', 'spark'); bubble(pick(["Huh? I'm up!", 'Five more minutes…', 'Oh! Hi there!']), 1800); }
+    function wake() { lastAct = Date.now(); if (K.float) fxSheet('Fx', b.x, b.y - b.ht / 2); setState(K.float ? 'hover' : 'idle', SH ? playOnce('Wake') + 300 : 900); b.happyUntil = performance.now() + 900; fx('!', 'spark'); bubble(pick(["Huh? I'm up!", 'Five more minutes…', 'Oh! Hi there!']), 1800); }
 
     function update(t, dt) {
       if (K.float) return floatUpdate(t, dt);
@@ -390,7 +391,8 @@
       else if (SH) {
         lastAct = Date.now(); b.sitUntil = 0;
         setState(K.float ? 'hover' : 'idle', playOnce(pick(K.clicks)) + 400);
-        for (let i = 0; i < 3; i++) setTimeout(() => fx(i % 2 ? '✦' : '⚡', 'spark'), i * 120);
+        if (K.float) fxSheet('Fx', b.x, b.y - b.ht / 2);
+        for (let i = 0; i < 3; i++) setTimeout(() => fx(i % 2 || K.float ? '✦' : '⚡', 'spark'), i * 120);
         bubble(Math.random() < .5 ? hint() : pick(K.lines));
       }
       else celebrate(Math.random() < .5 ? hint() : pick(K.lines));
