@@ -57,6 +57,9 @@
     pika: { name: 'Pikachu', icon: '⚡', pref: 'get.buddy3', sheet: 'pika', scale: 2, glow: 'rgba(255,220,60,.35)',
       hello: 'Pika pika! ⚡', held: 'Pikaaa?! ⚡', lines: ['Pika?', 'Pikaaa~ ⚡', 'Chu! Do your quests!', 'Pika pi! ✦'],
       clicks: ['Pose', 'Shock', 'Charge', 'Nod'], extras: ['LookUp', 'Eat', 'DeepBreath', 'Rotate', 'Nod', 'Sit'] },
+    paimon: { name: 'Paimon', icon: '✨', pref: 'get.buddy4', sheet: 'paimon', scale: 2, float: true, flip: true, glow: 'rgba(160,220,255,.4)',
+      hello: 'Hi! Paimon is here! ✨', held: 'Hey! Put Paimon down!', lines: ['Ehe~', "Paimon is not emergency food!", "Let's finish those quests!", 'Paimon is the best guide ever!'],
+      clicks: ['Taunt'], extras: ['Wait', 'Taunt', 'Wait'] },
   };
 
   /* ---------- shared world ---------- */
@@ -122,13 +125,114 @@
       if (b.sitUntil > t) return frameOf('Sit', diag, t - b.sitT0, false);
       return frameOf('Idle', diag, t, true);
     }
-    function drawSheet(t) {
-      const [sx, sy, w, h, ax, ay] = SH.frames[sheetFrame(t)];
-      const cw = w * SC, ch = h * SC;
+    function drawSheet(t, fi) {
+      const [sx, sy, w, h, ax, ay] = SH.frames[fi != null ? fi : sheetFrame(t)];
+      const cw = w * SC, ch = h * SC, flip = K.flip && b.face < 0;
       if (cv.width !== cw || cv.height !== ch) { cv.width = cw; cv.height = ch; } else ctx.clearRect(0, 0, cw, ch);
       ctx.imageSmoothingEnabled = false;
-      if (img.complete) ctx.drawImage(img, sx, sy, w, h, 0, 0, cw, ch);
-      return [ax * SC, ay * SC];
+      if (img.complete) {
+        if (flip) { ctx.save(); ctx.translate(cw, 0); ctx.scale(-1, 1); }
+        ctx.drawImage(img, sx, sy, w, h, 0, 0, cw, ch);
+        if (flip) ctx.restore();
+      }
+      return [(flip ? w - ax : ax) * SC, ay * SC];
+    }
+
+    /* ---------- floating characters (no gravity) ---------- */
+    const HOV = 16;
+    const shadow = document.createElement('div'); shadow.className = 'buddy-shadow';
+    function fxSheet(n, x, y, rev) {
+      const A = SH.anims[n]; if (!A) return;
+      const ids = A.dirs.r.slice(); if (rev) ids.reverse();
+      const c = document.createElement('canvas'); c.className = 'buddy-fxs'; const g = c.getContext('2d');
+      document.body.appendChild(c); let i = 0;
+      const tick = () => {
+        if (i >= ids.length || !on) { c.remove(); return; }
+        const [sx, sy, w, h, ax, ay] = SH.frames[ids[i++]];
+        c.width = w * SC; c.height = h * SC; g.imageSmoothingEnabled = false;
+        g.drawImage(img, sx, sy, w, h, 0, 0, w * SC, h * SC);
+        c.style.transform = `translate(${Math.round(x - ax * SC)}px,${Math.round(y - ay * SC)}px)`;
+        setTimeout(tick, 55);
+      };
+      tick();
+    }
+    function pickPlat(exclude) { scan(); const c = plats.filter(p => p.el !== exclude); return c.length ? pick(c) : null; }
+    function flyTo(p, x) {
+      b.sup = p ? p.el : null;
+      b.tx = x != null ? x : (p ? p.l + Math.random() * (p.r - p.l) : innerWidth / 2);
+      const nf = b.tx > b.x ? 1 : -1;
+      if (nf !== b.face) { b.face = nf; playOnce('Turn'); }
+      setState('fly');
+    }
+    function poof() { fxSheet('Fx', b.x, b.y - b.ht / 2); b.hidden = true; setState('poof', 450); }
+    function floatDecide() {
+      if (Date.now() - lastAct > 40000) { setState('sleep'); bubble('Zzz…', 1600); return; }
+      const roll = Math.random(), r = supRect();
+      if (roll < 0.4) { const p = pickPlat(b.sup); if (p) { flyTo(p); return; } }
+      if (roll < 0.62 && r && !r.floor) { flyTo({ el: b.sup }, r.l + Math.random() * (r.r - r.l)); return; }
+      if (roll < 0.72) { poof(); return; }
+      setState('hover', playOnce(pick(K.extras)) + 800);
+    }
+    function floatFrame(t) {
+      if (b.once && t >= b.once.end) b.once = null;
+      if (b.st === 'held') return frameOf('Run', 'r', t * 1.6, true);
+      if (b.once) return frameOf(b.once.n, 'r', t - b.once.t0, false);
+      if (b.st === 'fly' || b.st === 'fall') return frameOf('Run', 'r', t, true);
+      if (b.st === 'sleep') return SH.anims.Stand.dirs.r[0];
+      return frameOf('Stand', 'r', t, true);
+    }
+    function floatUpdate(t, dt) {
+      let r = supRect();
+      if (b.st === 'held') { b.x = mx; b.y = my + b.ht * 0.6; }
+      else if (b.st === 'fall') {                     // drifting after being thrown
+        b.x += b.vx * dt; b.y += b.vy * dt;
+        const damp = Math.pow(0.93, dt); b.vx *= damp; b.vy *= damp;
+        if (b.x < 20 || b.x > innerWidth - 20) { b.x = Math.max(20, Math.min(innerWidth - 20, b.x)); b.vx *= -0.6; }
+        if (b.y < 60 || b.y > innerHeight - 10) { b.y = Math.max(60, Math.min(innerHeight - 10, b.y)); b.vy *= -0.6; }
+        if (Math.hypot(b.vx, b.vy) < 0.4) {
+          scan(); let best = null, bd = 1e9;
+          for (const p of plats) { const cx = Math.max(p.l, Math.min(p.r, b.x)); const d = Math.hypot(cx - b.x, p.t - HOV - b.y) + (p.t < b.y ? 150 : 0); if (d < bd) { bd = d; best = p; } }
+          flyTo(best, best ? Math.max(best.l, Math.min(best.r, b.x)) : null);
+        }
+      } else if (b.st === 'poof') {
+        if (t > b.until) {
+          const p = pickPlat(b.sup); b.sup = p ? p.el : null; const rr = supRect();
+          b.x = p ? p.l + Math.random() * (p.r - p.l) : innerWidth / 2; b.y = rr.t - HOV; b.hidden = false;
+          fxSheet('Fx', b.x, b.y - b.ht / 2, true); setState('hover', 1500 + Math.random() * 2000);
+        }
+      } else {
+        if (!r) { flyTo(pickPlat()); r = supRect(); }
+        if (!r.floor && (r.t < 30 || r.t > innerHeight + 10)) { b.hidden = true; setState('poof', 0); }
+        else {
+          const sleep = b.st === 'sleep', ty = r.t - (sleep ? 4 : HOV);
+          if (b.st === 'fly') {
+            const dx = b.tx - b.x, dy = ty - b.y, d = Math.hypot(dx, dy);
+            if (d < 3) { b.x = b.tx; setState('hover', 1500 + Math.random() * 2500); }
+            else { const sp = Math.min(3.4, 0.6 + d * 0.05) * dt; b.x += dx / d * Math.min(sp, d); b.y += dy / d * Math.min(sp, d); }
+          } else {
+            b.y += (ty - b.y) * Math.min(1, 0.12 * dt);
+            if (b.x < r.l) b.x += (r.l - b.x) * 0.1; if (b.x > r.r) b.x += (r.r - b.x) * 0.1;
+            if (sleep) { if (t - lastZ > 1300) { lastZ = t; fx('z', 'zz'); } if (Math.hypot(mx - b.x, my - (b.y - 20)) < 70) wake(); }
+            else {
+              if (t > b.until) floatDecide();
+              if (b.st === 'hover' && !b.once && Math.abs(mx - b.x) < 160 && Math.abs(my - b.y) < 160 && Math.abs(mx - b.x) > 8) { const nf = mx > b.x ? 1 : -1; if (nf !== b.face) { b.face = nf; playOnce('Turn'); } }
+            }
+          }
+        }
+      }
+      // draw
+      const bob = (b.st === 'sleep' || b.st === 'held') ? 0 : Math.sin(t / 520) * 3;
+      const [ax, ay] = drawSheet(t, floatFrame(t));
+      b.ht = ay;
+      cv.style.opacity = b.hidden ? 0 : 1;
+      cv.style.transform = `translate(${Math.round(b.x - ax)}px,${Math.round(b.y + bob - ay)}px)`;
+      r = supRect();
+      if (r && b.st !== 'held' && !b.hidden) {
+        const gap = Math.max(0, r.t - b.y - bob), k = Math.max(0.3, Math.min(1, 1 - gap / 220));
+        shadow.style.opacity = (0.55 * k).toFixed(2);
+        shadow.style.transform = `translate(${Math.round(b.x)}px,${Math.round(r.t)}px) scale(${k.toFixed(2)})`;
+      } else shadow.style.opacity = 0;
+      say.style.transform = `translate(${Math.round(Math.max(8, Math.min(innerWidth - 190, b.x - 90)))}px,${Math.round(b.y + bob - b.ht - 34)}px)`;
     }
 
     function render(o) {
@@ -151,6 +255,7 @@
       b.poseOnLand = false;
     }
     function respawn() {
+      if (K.float) { b.hidden = true; setState('poof', 300); return; }
       scan(); const p = pick(plats);
       b.x = p ? p.l + Math.random() * (p.r - p.l) : innerWidth / 2;
       b.y = -30; b.vx = 0; b.vy = 0; b.sup = null; setState('fall');
@@ -197,14 +302,20 @@
     function bubble(text, ms) { say.textContent = text; say.classList.add('show'); clearTimeout(sayT); sayT = setTimeout(() => say.classList.remove('show'), ms || 2600); }
     function celebrate(text) {
       if (!on || b.st === 'held') return;
+      if (K.float) {
+        b.hidden = false; setState('hover', playOnce('Taunt') + 300);
+        for (let i = 0; i < 4; i++) setTimeout(() => fx(i % 2 ? '✦' : '♥', i % 2 ? 'spark' : 'heart'), i * 120);
+        if (text) bubble(text); return;
+      }
       if (supRect()) { b.vy = -7.5; b.vx = 0; b.sup = null; setState('fall'); }
       b.happyUntil = performance.now() + 1400; b.poseOnLand = true; b.sitUntil = 0;
       for (let i = 0; i < 4; i++) setTimeout(() => fx(i % 2 ? '✦' : '♥', i % 2 ? 'spark' : 'heart'), i * 120);
       if (text) bubble(text);
     }
-    function wake() { lastAct = Date.now(); setState('idle', SH ? playOnce('Wake') + 300 : 900); b.happyUntil = performance.now() + 900; fx('!', 'spark'); bubble(pick(["Huh? I'm up!", 'Five more minutes…', 'Oh! Hi there!']), 1800); }
+    function wake() { lastAct = Date.now(); setState(K.float ? 'hover' : 'idle', SH ? playOnce('Wake') + 300 : 900); b.happyUntil = performance.now() + 900; fx('!', 'spark'); bubble(pick(["Huh? I'm up!", 'Five more minutes…', 'Oh! Hi there!']), 1800); }
 
     function update(t, dt) {
+      if (K.float) return floatUpdate(t, dt);
       if (b.st === 'held') { b.x = mx; b.y = my + b.ht * 0.6; }
       else if (b.st === 'fall') {
         b.vy += G * dt;
@@ -278,7 +389,7 @@
       else if (b.st === 'sleep') wake();
       else if (SH) {
         lastAct = Date.now(); b.sitUntil = 0;
-        setState('idle', playOnce(pick(K.clicks)) + 400);
+        setState(K.float ? 'hover' : 'idle', playOnce(pick(K.clicks)) + 400);
         for (let i = 0; i < 3; i++) setTimeout(() => fx(i % 2 ? '✦' : '⚡', 'spark'), i * 120);
         bubble(Math.random() < .5 ? hint() : pick(K.lines));
       }
@@ -289,8 +400,8 @@
     return {
       kind, K, update, celebrate,
       get on() { return on; },
-      start() { on = true; if (!cv.isConnected) document.body.append(cv, say); respawn(); setTimeout(() => bubble(K.hello, 2200), 900); },
-      stop() { on = false; cv.remove(); say.remove(); },
+      start() { on = true; if (!cv.isConnected) document.body.append(cv, say); if (K.float) document.body.append(shadow); respawn(); setTimeout(() => bubble(K.hello, 2200), 900); },
+      stop() { on = false; cv.remove(); say.remove(); shadow.remove(); },
     };
   }
 
