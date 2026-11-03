@@ -623,3 +623,12 @@ a,button,label,select,summary,[role=button],[data-filter],[data-toggle],[data-gt
 .mi-badge{margin-left:auto;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;background:linear-gradient(90deg,#ff7eb6,#b46bff);color:#fff;box-shadow:0 0 10px rgba(255,126,182,.4)}
 .mi-badge.off{background:rgba(255,255,255,.08);color:#8f98b5;box-shadow:none}
 .acct .menu-sep{background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent);margin:6px 4px}
+
+/* ===== Mobile: tabs row + tidy toolbar row ===== */
+@media (max-width:600px){
+  .list-head{border-bottom:0;gap:8px 10px;margin:14px 0 12px}
+  .list-head .cats{flex:1 0 100%;border-bottom:1px solid var(--line);margin-bottom:0}
+  .list-head .spacer{display:none}
+  #showDoneWrap{padding:2px 0;font-size:12.5px}
+  #clearEnded{margin:0 0 0 auto}
+}
