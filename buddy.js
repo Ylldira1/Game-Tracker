@@ -55,8 +55,12 @@
       pal: { K: '#1a1030', B: '#a78bfa', D: '#7c5ce0', L: '#e4dcff', C: '#22d3ee', C2: '#0e9fb3', P: '#ff7eb6', G: '#5ee6a0', G2: '#2fb877', W: '#ffffff' },
       hello: "Hi! I'm Mochi ✦", lines: ['Hehe, that tickles!', 'Pull luck +1 ✦', 'I believe in your 50/50!'] },
     pika: { name: 'Pikachu', icon: '⚡', pref: 'get.buddy3', sheet: 'pika', scale: 2, glow: 'rgba(255,220,60,.35)',
-      hello: 'Pika pika! ⚡', held: 'Pikaaa?! ⚡', lines: ['Pika?', 'Pikaaa~ ⚡', 'Chu! Do your quests!', 'Pika pi! ✦'],
+      hello: 'Pika pika! ⚡', held: 'Pikaaa?! ⚡', ouch: ['Pika…!', 'Ow ow…'], spark: '⚡', lines: ['Pika?', 'Pikaaa~ ⚡', 'Chu! Do your quests!', 'Pika pi! ✦'],
       clicks: ['Pose', 'Shock', 'Charge', 'Nod'], extras: ['LookUp', 'Eat', 'DeepBreath', 'Rotate', 'Nod', 'Sit'] },
+    lumine: { name: 'Lumine', icon: '🌟', pref: 'get.buddy5', sheet: 'lumine', scale: 1, glow: 'rgba(255,214,120,.35)',
+      hello: 'Hi! Ready for an adventure? ✦', held: 'W-wait, put me down!', ouch: ['Oof…', 'Ouch!'],
+      lines: ['Let\'s check today\'s quests!', 'Teyvat won\'t explore itself~', 'Have you seen my brother?', 'Ad astra abyssosque!'],
+      clicks: ['Wave', 'Pose', 'Shy'], extras: ['Look', 'Shy', 'Wave', 'Look'] },
     paimon: { name: 'Paimon', icon: '✨', pref: 'get.buddy4', sheet: 'paimon', scale: 2, float: true, flip: true, glow: 'rgba(160,220,255,.4)',
       hello: 'Hi! Paimon is here! ✨', held: 'Hey! Put Paimon down!', lines: ['Ehe~', "Paimon is not emergency food!", "Let's finish those quests!", 'Paimon is the best guide ever!'],
       clicks: ['Taunt'], extras: ['Wait', 'Taunt', 'Wait'] },
@@ -267,7 +271,8 @@
     const standOn = p => { b.sup = p ? p.el : null; b.vx = 0; b.vy = 0; b.land = performance.now(); setState('idle', 600 + Math.random() * 1800); };
     function afterLand(hard) {
       if (!SH) return;
-      if (hard) { const ms = playOnce('HitGround'); setState('idle', ms + 400); bubble(pick(['Pika…!', 'Ow ow…']), 1400); }
+      if (b.spawn) { hard = false; b.spawn = false; }        // dropping in on page load isn't a crash
+      if (hard) { const ms = playOnce('HitGround'); setState('idle', ms + 400); bubble(pick(K.ouch || ['Ow…']), 1400); }
       else if (b.poseOnLand) { const ms = playOnce('Pose'); setState('idle', ms + 500); }
       b.poseOnLand = false;
     }
@@ -275,7 +280,7 @@
       if (K.float) { b.hidden = true; setState('poof', 300); return; }
       scan(); const p = pick(plats);
       b.x = p ? p.l + Math.random() * (p.r - p.l) : innerWidth / 2;
-      b.y = -30; b.vx = 0; b.vy = 0; b.sup = null; setState('fall');
+      b.y = -30; b.vx = 0; b.vy = 0; b.sup = null; b.spawn = true; setState('fall');
     }
     function supRect() {
       if (!b.sup) return { l: 16, r: innerWidth - 16, t: innerHeight - 2, floor: true };
@@ -296,7 +301,7 @@
     }
     function decide() {
       const r = supRect(); if (!r) return;
-      if (Date.now() - lastAct > 40000 && !r.floor) { setState('sleep'); bubble('Zzz…', 1600); return; }
+      if (Date.now() - lastAct > 40000 && !r.floor) { setState('sleep'); if (SH && SH.anims.FallAsleep) playOnce('FallAsleep'); bubble('Zzz…', 1600); return; }
       const roll = Math.random();
       if (SH && !r.floor && Math.random() < 0.3) {
         const n = pick(K.extras), now = performance.now();
@@ -379,7 +384,9 @@
       if (SH) {
         const [ax, ay] = drawSheet(t);
         b.ht = ay;
-        cv.style.transform = `translate(${Math.round(b.x - ax)}px,${Math.round(b.y - ay)}px)`;
+        const br = b.st === 'sleep' && !b.once ? Math.sin(t / 900) * 0.025 : 0;   // breathing while asleep
+        cv.style.transformOrigin = `${Math.round(ax)}px ${Math.round(ay)}px`;
+        cv.style.transform = `translate(${Math.round(b.x - ax)}px,${Math.round(b.y - ay)}px)` + (br ? ` scale(${(1 - br / 2).toFixed(3)},${(1 + br).toFixed(3)})` : '');
       } else {
         render(o); b.ht = H * S - 2;
         cv.style.transform = `translate(${Math.round(b.x - W * S / 2)}px,${Math.round(b.y - H * S + 2)}px)`;
@@ -408,7 +415,7 @@
         lastAct = Date.now(); b.sitUntil = 0;
         setState(K.float ? 'hover' : 'idle', playOnce(pick(K.clicks)) + 400);
         if (K.float) fxSheet('Fx', b.x, b.y - b.ht / 2);
-        for (let i = 0; i < 3; i++) setTimeout(() => fx(i % 2 || K.float ? '✦' : '⚡', 'spark'), i * 120);
+        for (let i = 0; i < 3; i++) setTimeout(() => fx(i % 2 ? '✦' : (K.spark || '✦'), 'spark'), i * 120);
         bubble(Math.random() < .5 ? hint() : pick(K.lines));
       }
       else celebrate(Math.random() < .5 ? hint() : pick(K.lines));
@@ -451,7 +458,7 @@
   }).observe(toastEl, { attributes: true, attributeFilter: ['class', 'style'] });
 
   /* ---------- Buddy collection (one menu item → picker window) ---------- */
-  const TAGS = { mochi: 'Walks, jumps & naps', pika: 'Hops, sparks & tumbles', paimon: 'Floats & teleports' };
+  const TAGS = { mochi: 'Walks, jumps & naps', pika: 'Hops, sparks & tumbles', lumine: 'Runs, waves & naps', paimon: 'Floats & teleports' };
   const exp = document.getElementById('exportBtn');
   const menuBtn = document.createElement('button'); menuBtn.id = 'buddiesBtn'; menuBtn.className = 'mi';
   menuBtn.innerHTML = `<span class="mi-ic" style="--ic:#ff7eb6"><svg viewBox="0 0 24 24" fill="currentColor"><ellipse cx="6" cy="10" rx="2.2" ry="2.8"/><ellipse cx="10" cy="5.5" rx="2.2" ry="2.8"/><ellipse cx="14.5" cy="5.5" rx="2.2" ry="2.8"/><ellipse cx="18.5" cy="10" rx="2.2" ry="2.8"/><path d="M12.2 11c-3.2 0-6.2 4.4-6.2 6.8 0 1.7 1.3 2.7 3 2.7 1.3 0 2.2-.7 3.2-.7s1.9.7 3.2.7c1.7 0 3-1 3-2.7 0-2.4-3-6.8-6.2-6.8z"/></svg></span><span class="mi-tx"><b>Buddies</b><small>Page companions</small></span><span class="mi-badge"></span>`;
@@ -487,7 +494,7 @@
       const { sheet, fi } = previewFrame(bd, t);
       const im = imgs[K.sheet] || (imgs[K.sheet] = Object.assign(new Image(), { src: sheet.img }));
       const [sx, sy, w, h, ax, ay] = sheet.frames[fi];
-      const top = (K.float ? 18 : 10), ps = Math.min(PS, Math.floor((c.height - top - 8) / ay));
+      const top = (K.float ? 18 : 10), ps = Math.min(PS, (c.height - top - 8) / ay);
       if (im.complete) g.drawImage(im, sx, sy, w, h, Math.round(c.width / 2 - ax * ps), Math.round(c.height - top - ay * ps + bob), w * ps, h * ps);
     } else {
       const k = t / 1000, blink = (t % 3200) < 130;
